@@ -16,12 +16,13 @@ class SheetParser:
         self.table_parser = TableParser(config)
         self.image_parser = ImageParser(config)
 
-    def parse_sheet(self, sheet) -> Dict[str, Any]:
+    def parse_sheet(self, sheet, sheet_with_values=None) -> Dict[str, Any]:
         """
         シートを解析してMarkdown形式に変換
 
         Args:
-            sheet: openpyxlのWorksheetオブジェクト
+            sheet: openpyxlのWorksheetオブジェクト（数式情報用）
+            sheet_with_values: 実数値を含むシート（data_only=True）
 
         Returns:
             シートデータの辞書
@@ -38,7 +39,7 @@ class SheetParser:
         }
 
         # テーブルの検出と変換
-        tables_md, tables_info = self.table_parser.parse_tables(sheet)
+        tables_md, tables_info = self.table_parser.parse_tables(sheet, sheet_with_values)
         sheet_data['tables'] = tables_info
         sheet_data['tables_count'] = len(tables_info)
 
@@ -62,7 +63,7 @@ class SheetParser:
 
         # もしテーブルも画像もない場合は、シート全体をテーブルとして扱う
         if not content_parts:
-            fallback_md = self._convert_sheet_as_table(sheet)
+            fallback_md = self._convert_sheet_as_table(sheet, sheet_with_values)
             if fallback_md:
                 content_parts.append(fallback_md)
 
@@ -76,11 +77,11 @@ class SheetParser:
             return sheet.dimensions
         return "A1:A1"
 
-    def _convert_sheet_as_table(self, sheet) -> str:
+    def _convert_sheet_as_table(self, sheet, sheet_with_values=None) -> str:
         """シート全体を1つのテーブルとして変換（フォールバック）"""
         # 使用されている範囲を取得
         if not sheet.dimensions or sheet.dimensions == "A1:A1":
             return ""
 
         # シート全体を1つの大きなテーブルとして解析
-        return self.table_parser.convert_range_to_markdown(sheet, sheet.dimensions)
+        return self.table_parser.convert_range_to_markdown(sheet, sheet.dimensions, sheet_with_values)

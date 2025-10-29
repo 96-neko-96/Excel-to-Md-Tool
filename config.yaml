@@ -5,7 +5,7 @@ conversion:
   create_toc: true              # 目次生成
   extract_images: true          # 画像抽出
   generate_summary: false       # 表の要約生成
-  preserve_formulas: false      # 数式の保持（結果値のみか数式も保存か）
+  show_formulas: true           # 数式を備考として表示（実数値を優先表示）
 
 # 出力設定
 output:

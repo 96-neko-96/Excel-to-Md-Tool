@@ -1,17 +1,21 @@
-# Excel to Markdown Converter
+# Excel to Markdown Converter v2.0
 
 RAGシステム用にExcelファイルをMarkdown形式に変換するWebアプリケーション
 
-![Version](https://img.shields.io/badge/version-0.1.0-blue)
+![Version](https://img.shields.io/badge/version-2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.9+-green)
 ![License](https://img.shields.io/badge/license-MIT-yellow)
+![Phase](https://img.shields.io/badge/phase-2%20完了-success)
 
 ## 概要
 
 複数シート、表、グラフを含む複雑なExcelファイルを、RAGシステムで利用しやすいMarkdown形式に変換するツールです。Streamlitベースの直感的なWebUIを提供し、シート間の参照関係を保持しながら、ブック単位で1つのMarkdownファイルに統合します。
 
+**Phase 2完了**: プリセット管理、バッチ処理、変換履歴、Excel関数の実数値優先表示機能を追加しました。
+
 ## 主な機能
 
+### Phase 1機能（基本機能）
 - ✅ **複数シート対応**: すべてのシートを1つのMarkdownファイルに統合
 - ✅ **表の変換**: ExcelテーブルをMarkdown table形式に変換
 - ✅ **画像抽出**: グラフや画像を抽出してファイル参照を生成
@@ -19,6 +23,17 @@ RAGシステム用にExcelファイルをMarkdown形式に変換するWebアプ�
 - ✅ **メタデータ生成**: RAGシステム用の詳細なメタデータを出力
 - ✅ **目次自動生成**: シート構造から自動的に目次を作成
 - ✅ **RAG最適化**: チャンクサイズ調整、キーワード抽出、階層構造の保持
+
+### Phase 2機能（拡張機能）
+- ✅ **Excel関数の実数値優先表示**: 数式の計算結果を表示し、数式自体は備考として保持
+- ✅ **プリセット設定管理**: よく使う設定を保存・読み込み可能
+- ✅ **バッチ処理**: 複数のExcelファイルを一括変換
+- ✅ **変換履歴管理**: 過去の変換履歴を記録・表示
+- ✅ **4つのデフォルトプリセット**:
+  - デフォルト（標準設定）
+  - RAG最適化（RAGシステム向け）
+  - 完全変換（すべての情報を含む）
+  - 軽量版（最小限の情報のみ）
 
 ## システム要件
 

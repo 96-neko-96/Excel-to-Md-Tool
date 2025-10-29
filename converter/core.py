@@ -29,9 +29,13 @@ class ExcelToMarkdownConverter:
             'create_toc': config.get('create_toc', True),
             'extract_images': config.get('extract_images', True),
             'generate_summary': config.get('generate_summary', False),
+            'show_formulas': config.get('show_formulas', True),
         }
+        # その他の設定をマージ
+        self.config.update(config)
 
         self.workbook = None
+        self.workbook_with_values = None  # 実数値用
         self.sheets_data = []
         self.cross_references = []
 
@@ -52,16 +56,19 @@ class ExcelToMarkdownConverter:
         Returns:
             変換結果の統計情報
         """
-        # 1. Excel読み込み
-        self.workbook = self._load_excel(input_path)
+        # 1. Excel読み込み（数式用と実数値用の2つ）
+        self.workbook, self.workbook_with_values = self._load_excel(input_path)
 
         # 2. 各シートを変換
-        for sheet in self.workbook.worksheets:
+        for idx, sheet in enumerate(self.workbook.worksheets):
             # 非表示シートはスキップ（設定による）
             if sheet.sheet_state == 'hidden' and not self.config.get('include_hidden', False):
                 continue
 
-            sheet_data = self._convert_sheet(sheet)
+            # 対応する実数値シートを取得
+            sheet_with_values = self.workbook_with_values.worksheets[idx] if self.workbook_with_values else None
+
+            sheet_data = self._convert_sheet(sheet, sheet_with_values)
             self.sheets_data.append(sheet_data)
 
         # 3. シート間参照解析
@@ -85,18 +92,22 @@ class ExcelToMarkdownConverter:
             'output_file': output_path
         }
 
-    def _load_excel(self, path: str) -> openpyxl.Workbook:
-        """Excelファイルを読み込む"""
+    def _load_excel(self, path: str) -> tuple:
+        """Excelファイルを読み込む（数式用と実数値用の2つ）"""
         try:
-            # data_onlyをFalseにして数式も読み込む
-            workbook = openpyxl.load_workbook(path, data_only=False)
-            return workbook
+            # 数式情報を保持して読み込み
+            workbook_formulas = openpyxl.load_workbook(path, data_only=False)
+
+            # 実数値のみを読み込み
+            workbook_values = openpyxl.load_workbook(path, data_only=True)
+
+            return workbook_formulas, workbook_values
         except Exception as e:
             raise ValueError(f"Excelファイルの読み込みに失敗しました: {str(e)}")
 
-    def _convert_sheet(self, sheet) -> Dict[str, Any]:
+    def _convert_sheet(self, sheet, sheet_with_values=None) -> Dict[str, Any]:
         """シートを変換"""
-        return self.sheet_parser.parse_sheet(sheet)
+        return self.sheet_parser.parse_sheet(sheet, sheet_with_values)
 
     def _analyze_references(self) -> List[Dict[str, Any]]:
         """シート間参照を解析"""
