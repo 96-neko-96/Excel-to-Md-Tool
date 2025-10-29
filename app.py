@@ -470,8 +470,8 @@ with tab3:
         with col2:
             model_name = st.text_input(
                 "Geminiモデル",
-                value="gemini-2.0-flash-exp",
-                help="使用するGeminiモデル名を入力 (例: gemini-2.0-flash-exp, gemini-1.5-pro, gemini-1.5-flash)"
+                value="gemini-2.5-flash-lite",
+                help="使用するGeminiモデル名を入力 (例: gemini-2.5-flash-lite, gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash-lite)"
             )
 
     # 分析実行

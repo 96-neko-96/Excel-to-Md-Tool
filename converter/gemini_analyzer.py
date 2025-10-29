@@ -15,13 +15,13 @@ from io import BytesIO
 class GeminiAnalyzer:
     """Gemini APIを使用して画像を分析するクラス"""
 
-    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash-exp"):
+    def __init__(self, api_key: str, model_name: str = "gemini-2.5-flash-lite"):
         """
         初期化
 
         Args:
             api_key: Gemini APIキー
-            model_name: 使用するモデル名（デフォルト: gemini-2.0-flash-exp）
+            model_name: 使用するモデル名（デフォルト: gemini-2.5-flash-lite）
         """
         self.api_key = api_key
         self.model_name = model_name
