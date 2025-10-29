@@ -468,10 +468,10 @@ with tab3:
         with col1:
             dpi = st.slider("画像解像度 (DPI)", 100, 300, 150, 25)
         with col2:
-            model_name = st.selectbox(
+            model_name = st.text_input(
                 "Geminiモデル",
-                ["gemini-1.5-flash", "gemini-1.5-pro"],
-                help="Flash: 高速・低コスト / Pro: 高精度"
+                value="gemini-2.0-flash-exp",
+                help="使用するGeminiモデル名を入力 (例: gemini-2.0-flash-exp, gemini-1.5-pro, gemini-1.5-flash)"
             )
 
     # 分析実行
@@ -496,7 +496,8 @@ with tab3:
 
                     workflow = GeminiWorkflowManager(
                         gemini_api_key=gemini_api_key,
-                        dpi=dpi
+                        dpi=dpi,
+                        model_name=model_name
                     )
 
                     # 進捗コールバック

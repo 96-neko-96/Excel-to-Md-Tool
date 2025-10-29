@@ -17,20 +17,22 @@ class GeminiWorkflowManager:
     Excel → 画像 → Gemini分析の統合ワークフローを管理するクラス
     """
 
-    def __init__(self, gemini_api_key: str, dpi: int = 150):
+    def __init__(self, gemini_api_key: str, dpi: int = 150, model_name: str = "gemini-2.0-flash-exp"):
         """
         初期化
 
         Args:
             gemini_api_key: Gemini APIキー
             dpi: 画像の解像度（デフォルト: 150）
+            model_name: 使用するGeminiモデル名（デフォルト: gemini-2.0-flash-exp）
         """
         self.gemini_api_key = gemini_api_key
         self.dpi = dpi
+        self.model_name = model_name
 
         # コンバーターとアナライザーの初期化
         self.image_converter = SheetToImageConverter(dpi=dpi)
-        self.gemini_analyzer = GeminiAnalyzer(api_key=gemini_api_key)
+        self.gemini_analyzer = GeminiAnalyzer(api_key=gemini_api_key, model_name=model_name)
 
     def process_excel_file(
         self,
