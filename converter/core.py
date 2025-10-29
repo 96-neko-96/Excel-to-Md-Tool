@@ -3,6 +3,7 @@ Excel to Markdown Converter Core
 """
 
 import os
+import warnings
 import openpyxl
 from typing import Dict, List, Any
 from datetime import datetime
@@ -95,11 +96,15 @@ class ExcelToMarkdownConverter:
     def _load_excel(self, path: str) -> tuple:
         """Excelファイルを読み込む（数式用と実数値用の2つ）"""
         try:
-            # 数式情報を保持して読み込み
-            workbook_formulas = openpyxl.load_workbook(path, data_only=False)
+            # openpyxlの警告を抑制（データ検証などの非サポート機能）
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
 
-            # 実数値のみを読み込み
-            workbook_values = openpyxl.load_workbook(path, data_only=True)
+                # 数式情報を保持して読み込み
+                workbook_formulas = openpyxl.load_workbook(path, data_only=False)
+
+                # 実数値のみを読み込み
+                workbook_values = openpyxl.load_workbook(path, data_only=True)
 
             return workbook_formulas, workbook_values
         except Exception as e:

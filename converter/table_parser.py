@@ -104,10 +104,16 @@ class TableParser:
             df = pd.DataFrame(data)
 
             # 空の行と列を削除
-            df = df.replace('', pd.NA).dropna(how='all', axis=0).dropna(how='all', axis=1)
+            # NAを使うとdf.emptyでエラーが出るため、Noneを使用
+            df = df.replace('', None)
+            df = df.dropna(how='all', axis=0).dropna(how='all', axis=1)
 
-            if df.empty:
+            # emptyの代わりにshapeでチェック
+            if df.shape[0] == 0 or df.shape[1] == 0:
                 return ""
+
+            # NAをfillnaで空文字に戻す
+            df = df.fillna('')
 
             # ヘッダーの検出
             if self.config.get('detect_header', True) and len(df) > 0:
@@ -137,7 +143,17 @@ class TableParser:
             return md_table
 
         except Exception as e:
-            print(f"テーブル変換エラー: {str(e)}")
+            import traceback
+            error_msg = f"テーブル変換エラー: {str(e)}"
+            print(error_msg)
+
+            # デバッグモードの場合は詳細なエラー情報を出力
+            if self.config.get('verbose_logging', False):
+                print(f"セル範囲: {cell_range}")
+                print(f"エラー詳細:")
+                traceback.print_exc()
+
+            # エラーが発生した場合は空文字列を返して処理を続行
             return ""
 
     def _generate_formula_notes(self, formulas: Dict) -> str:

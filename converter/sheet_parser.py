@@ -38,36 +38,49 @@ class SheetParser:
             'images_count': 0
         }
 
-        # テーブルの検出と変換
-        tables_md, tables_info = self.table_parser.parse_tables(sheet, sheet_with_values)
-        sheet_data['tables'] = tables_info
-        sheet_data['tables_count'] = len(tables_info)
+        try:
+            # テーブルの検出と変換
+            tables_md, tables_info = self.table_parser.parse_tables(sheet, sheet_with_values)
+            sheet_data['tables'] = tables_info
+            sheet_data['tables_count'] = len(tables_info)
 
-        # 画像の抽出（設定により）
-        images_md = []
-        if self.config.get('extract_images', True):
-            images_md, images_info = self.image_parser.extract_images(sheet)
-            sheet_data['images'] = images_info
-            sheet_data['images_count'] = len(images_info)
+            # 画像の抽出（設定により）
+            images_md = []
+            if self.config.get('extract_images', True):
+                images_md, images_info = self.image_parser.extract_images(sheet)
+                sheet_data['images'] = images_info
+                sheet_data['images_count'] = len(images_info)
 
-        # コンテンツの結合
-        content_parts = []
+            # コンテンツの結合
+            content_parts = []
 
-        # テーブルを追加
-        if tables_md:
-            content_parts.extend(tables_md)
+            # テーブルを追加
+            if tables_md:
+                content_parts.extend(tables_md)
 
-        # 画像を追加
-        if images_md:
-            content_parts.extend(images_md)
+            # 画像を追加
+            if images_md:
+                content_parts.extend(images_md)
 
-        # もしテーブルも画像もない場合は、シート全体をテーブルとして扱う
-        if not content_parts:
-            fallback_md = self._convert_sheet_as_table(sheet, sheet_with_values)
-            if fallback_md:
-                content_parts.append(fallback_md)
+            # もしテーブルも画像もない場合は、シート全体をテーブルとして扱う
+            if not content_parts:
+                fallback_md = self._convert_sheet_as_table(sheet, sheet_with_values)
+                if fallback_md:
+                    content_parts.append(fallback_md)
 
-        sheet_data['content'] = '\n\n'.join(content_parts)
+            sheet_data['content'] = '\n\n'.join(content_parts)
+
+        except Exception as e:
+            import traceback
+            error_msg = f"シート '{sheet.title}' の解析エラー: {str(e)}"
+            print(error_msg)
+
+            # デバッグモードの場合は詳細なエラー情報を出力
+            if self.config.get('verbose_logging', False):
+                traceback.print_exc()
+
+            # エラーメッセージをコンテンツに追加
+            sheet_data['content'] = f"⚠️ このシートの解析中にエラーが発生しました: {str(e)}"
 
         return sheet_data
 
