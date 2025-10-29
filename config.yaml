@@ -1,0 +1,45 @@
+# デフォルト設定
+
+# 変換設定
+conversion:
+  create_toc: true              # 目次生成
+  extract_images: true          # 画像抽出
+  generate_summary: false       # 表の要約生成
+  preserve_formulas: false      # 数式の保持（結果値のみか数式も保存か）
+
+# 出力設定
+output:
+  markdown_flavor: "github"     # github / commonmark / custom
+  line_ending: "lf"             # lf / crlf
+  encoding: "utf-8"
+
+# RAG最適化
+rag:
+  chunk_size: 800               # トークン数
+  chunk_overlap: 200            # オーバーラップ
+  include_metadata: true        # メタデータ生成
+  extract_keywords: true        # キーワード抽出
+
+# 表の処理
+table:
+  format: "markdown"            # markdown / html
+  include_empty_cells: false    # 空白セルの扱い
+  max_columns: 20               # 最大列数（超えたら警告）
+  detect_header: true           # ヘッダー行の自動検出
+
+# 画像処理
+image:
+  output_dir: "images"          # 出力ディレクトリ
+  format: "png"                 # png / jpg
+  max_size: [1920, 1080]        # 最大サイズ（ピクセル）
+  generate_description: false   # 画像説明の生成（将来的にLLM使用）
+
+# シート処理
+sheet:
+  include_hidden: false         # 非表示シートの処理
+  sheet_separator: "---"        # シート間の区切り
+
+# デバッグ
+debug:
+  save_intermediate: false      # 中間ファイルを保存
+  verbose_logging: false        # 詳細ログ出力
