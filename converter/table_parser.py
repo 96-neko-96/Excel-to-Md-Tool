@@ -37,7 +37,8 @@ class TableParser:
                     tables_info.append({
                         'name': table_name,
                         'range': table_range,
-                        'type': 'excel_table'
+                        'type': 'excel_table',
+                        'markdown': md_table  # Phase 3: AI機能用にMarkdownを保存
                     })
         else:
             # テーブルオブジェクトがない場合は、使用範囲全体を1つのテーブルとして扱う
@@ -48,7 +49,8 @@ class TableParser:
                     tables_info.append({
                         'name': 'data',
                         'range': sheet.dimensions,
-                        'type': 'auto_detected'
+                        'type': 'auto_detected',
+                        'markdown': md_table  # Phase 3: AI機能用にMarkdownを保存
                     })
 
         return tables_md, tables_info

@@ -24,6 +24,12 @@ class ExcelToMarkdownConverter:
             create_toc: 目次生成の有効化
             extract_images: 画像抽出の有効化
             generate_summary: 表要約の有効化
+            enable_ai_features: AI機能の有効化 (Phase 3)
+            ai_table_summary: 表の自然言語要約 (Phase 3)
+            ai_image_description: 画像の説明自動生成 (Phase 3)
+            ai_generate_qa: よくあるQA生成 (Phase 3)
+            gemini_api_key: Gemini APIキー (Phase 3)
+            gemini_model: Geminiモデル名 (Phase 3)
         """
         self.config = {
             'chunk_size': config.get('chunk_size', 800),
@@ -31,6 +37,13 @@ class ExcelToMarkdownConverter:
             'extract_images': config.get('extract_images', True),
             'generate_summary': config.get('generate_summary', False),
             'show_formulas': config.get('show_formulas', True),
+            # Phase 3: AI機能
+            'enable_ai_features': config.get('enable_ai_features', False),
+            'ai_table_summary': config.get('ai_table_summary', False),
+            'ai_image_description': config.get('ai_image_description', False),
+            'ai_generate_qa': config.get('ai_generate_qa', False),
+            'gemini_api_key': config.get('gemini_api_key', ''),
+            'gemini_model': config.get('gemini_model', 'gemini-2.5-flash-lite'),
         }
         # その他の設定をマージ
         self.config.update(config)
@@ -41,10 +54,25 @@ class ExcelToMarkdownConverter:
         self.cross_references = []
 
         # パーサーの初期化
-        self.sheet_parser = SheetParser(self.config)
+        self.sheet_parser = SheetParser(self.config, gemini_analyzer=None)  # 後で設定
         self.markdown_generator = MarkdownGenerator(self.config)
         self.metadata_generator = MetadataGenerator(self.config)
         self.image_parser = ImageParser(self.config)
+
+        # Phase 3: Gemini Analyzerの初期化（AI機能が有効な場合のみ）
+        self.gemini_analyzer = None
+        if self.config.get('enable_ai_features') and self.config.get('gemini_api_key'):
+            try:
+                from .gemini_analyzer import GeminiAnalyzer
+                self.gemini_analyzer = GeminiAnalyzer(
+                    api_key=self.config['gemini_api_key'],
+                    model_name=self.config['gemini_model']
+                )
+                # SheetParserにGeminiAnalyzerを設定
+                self.sheet_parser.set_gemini_analyzer(self.gemini_analyzer)
+            except Exception as e:
+                print(f"Gemini Analyzerの初期化エラー: {e}")
+                self.gemini_analyzer = None
 
     def convert(self, input_path: str, output_path: str) -> Dict[str, Any]:
         """

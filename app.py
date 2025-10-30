@@ -33,8 +33,8 @@ if 'current_preset' not in st.session_state:
     st.session_state.current_preset = "デフォルト"
 
 # ヘッダー
-st.title("📊 Excel to Markdown Converter v2.0")
-st.markdown("**Phase 2機能搭載:** RAG最適化、バッチ処理、プリセット管理、変換履歴")
+st.title("📊 Excel to Markdown Converter v3.0")
+st.markdown("**Phase 3機能搭載:** AI機能統合（表の要約、画像説明、QA生成）、RAG最適化、バッチ処理、プリセット管理、変換履歴")
 
 # タブで機能を分離
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🔄 単一ファイル変換", "📦 バッチ処理", "🤖 Gemini AI分析", "📜 変換履歴", "⚙️ 設定管理"])
@@ -64,7 +64,7 @@ with tab1:
         preset_config = st.session_state.preset_manager.get_preset(selected_preset)
 
         st.markdown("---")
-        st.markdown("### 📝 詳細設定")
+        st.markdown("### 📝 基本設定")
 
         create_toc = st.checkbox("目次を生成", value=preset_config.get('create_toc', True), help="シート一覧の目次を自動生成します")
         extract_images = st.checkbox("画像を抽出", value=preset_config.get('extract_images', True), help="グラフや画像を抽出して保存します")
@@ -79,6 +79,60 @@ with tab1:
             step=50,
             help="RAGシステム用のチャンクサイズ"
         )
+
+        st.markdown("---")
+        st.markdown("### 🤖 AI機能 (Phase 3)")
+
+        # Gemini API設定（グローバル設定から読み込み）
+        gemini_config = st.session_state.preset_manager.get_config()
+
+        with st.expander("🔑 Gemini API設定"):
+            gemini_api_key = st.text_input(
+                "APIキー",
+                type="password",
+                value=gemini_config.get('gemini_api_key', ''),
+                help="Google AI StudioでAPIキーを取得してください",
+                key="gemini_api_key_input"
+            )
+            gemini_model = st.text_input(
+                "モデル名",
+                value=gemini_config.get('gemini_model', 'gemini-2.5-flash-lite'),
+                help="使用するGeminiモデル名",
+                key="gemini_model_input"
+            )
+
+            # API設定を保存
+            if st.button("API設定を保存", key="save_gemini_config"):
+                st.session_state.preset_manager.update_config('gemini_api_key', gemini_api_key)
+                st.session_state.preset_manager.update_config('gemini_model', gemini_model)
+                st.success("API設定を保存しました")
+                st.rerun()
+
+        # AI機能チェックボックス（常に表示）
+        if not gemini_api_key:
+            st.info("💡 AI機能を使用するには、上記のGemini API設定が必要です")
+
+        ai_table_summary = st.checkbox(
+            "📊 表の自然言語要約",
+            value=preset_config.get('ai_table_summary', False),
+            help="各表のデータをAIが自然言語で要約します（Gemini API使用）",
+            disabled=not gemini_api_key
+        )
+        ai_image_description = st.checkbox(
+            "🖼️ 画像の説明自動生成",
+            value=preset_config.get('ai_image_description', False),
+            help="抽出した画像の内容をAIが説明します（Gemini API使用）",
+            disabled=not gemini_api_key
+        )
+        ai_generate_qa = st.checkbox(
+            "❓ よくあるQA生成",
+            value=preset_config.get('ai_generate_qa', False),
+            help="シートごとによくある質問と回答をAIが生成します（Gemini API使用）",
+            disabled=not gemini_api_key
+        )
+
+        # AI機能が1つでも有効かチェック
+        enable_ai_features = ai_table_summary or ai_image_description or ai_generate_qa
 
         st.markdown("---")
 
@@ -96,7 +150,11 @@ with tab1:
                                 'create_toc': create_toc,
                                 'extract_images': extract_images,
                                 'generate_summary': generate_summary,
-                                'show_formulas': show_formulas
+                                'show_formulas': show_formulas,
+                                # Phase 3: AI機能設定（各機能を個別に保存）
+                                'ai_table_summary': ai_table_summary,
+                                'ai_image_description': ai_image_description,
+                                'ai_generate_qa': ai_generate_qa
                             },
                             new_preset_desc
                         )
@@ -157,7 +215,14 @@ with tab1:
                         extract_images=extract_images,
                         generate_summary=generate_summary,
                         show_formulas=show_formulas,
-                        output_dir=os.path.join(temp_dir, 'images')
+                        output_dir=os.path.join(temp_dir, 'images'),
+                        # Phase 3: AI機能設定
+                        enable_ai_features=enable_ai_features,
+                        ai_table_summary=ai_table_summary,
+                        ai_image_description=ai_image_description,
+                        ai_generate_qa=ai_generate_qa,
+                        gemini_api_key=gemini_api_key if enable_ai_features else '',
+                        gemini_model=gemini_model if enable_ai_features else 'gemini-2.5-flash-lite'
                     )
 
                     status_text.text("🔄 シートを変換中...")
@@ -345,6 +410,11 @@ with tab2:
                 # プリセット設定を取得
                 batch_config = st.session_state.preset_manager.get_preset(batch_preset)
 
+                # Gemini API設定を追加（グローバル設定から）
+                gemini_config = st.session_state.preset_manager.get_config()
+                batch_config['gemini_api_key'] = gemini_config.get('gemini_api_key', '')
+                batch_config['gemini_model'] = gemini_config.get('gemini_model', 'gemini-2.5-flash-lite')
+
                 # バッチプロセッサーの初期化
                 processor = BatchProcessor(**batch_config)
 
@@ -438,21 +508,19 @@ with tab3:
     1. **セクション検出**: シート内の論理的なセクションを自動検出
     2. **セクション分析**: 各セクションの内容を詳細に分析
     3. **Markdown生成**: 分析結果をMarkdown形式で出力
+
+    **注**: このタブでは左サイドバーのGemini API設定を使用します。
     """)
 
-    # Gemini API キーの入力
-    st.markdown("---")
-    st.subheader("🔑 Gemini API設定")
-
-    gemini_api_key = st.text_input(
-        "Gemini APIキー",
-        type="password",
-        help="Google AI StudioでAPIキーを取得してください: https://makersuite.google.com/app/apikey"
-    )
+    # グローバル設定から読み込み
+    gemini_config = st.session_state.preset_manager.get_config()
+    gemini_api_key = gemini_config.get('gemini_api_key', '')
+    gemini_model = gemini_config.get('gemini_model', 'gemini-2.5-flash-lite')
 
     if not gemini_api_key:
-        st.warning("⚠️ Gemini APIキーを入力してください")
-        st.info("💡 Gemini APIキーの取得方法:\n1. https://makersuite.google.com/app/apikey にアクセス\n2. 'Create API Key'をクリック\n3. 生成されたキーをコピー")
+        st.warning("⚠️ 左サイドバーの「Gemini API設定」でAPIキーを設定してください")
+        st.info("💡 Gemini APIキーの取得方法:\n1. https://makersuite.google.com/app/apikey にアクセス\n2. 'Create API Key'をクリック\n3. 生成されたキーを左サイドバーのGemini API設定に入力し保存")
+        st.stop()
 
     # Excelファイルアップロード
     st.markdown("---")
@@ -467,18 +535,11 @@ with tab3:
 
     # 分析オプション
     with st.expander("⚙️ 分析オプション"):
-        col1, col2 = st.columns(2)
-        with col1:
-            dpi = st.slider("画像解像度 (DPI)", 100, 300, 150, 25)
-        with col2:
-            model_name = st.text_input(
-                "Geminiモデル",
-                value="gemini-2.5-flash-lite",
-                help="使用するGeminiモデル名を入力 (例: gemini-2.5-flash-lite, gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash-lite)"
-            )
+        dpi = st.slider("画像解像度 (DPI)", 100, 300, 150, 25, help="画像の解像度が高いほど詳細な分析が可能ですが、処理時間が長くなります")
+        st.info(f"使用するモデル: {gemini_model}（左サイドバーで変更可能）")
 
     # 分析実行
-    if gemini_uploaded_file and gemini_api_key:
+    if gemini_uploaded_file:
         if st.button("🚀 Gemini分析を開始", type="primary", use_container_width=True):
             temp_dir = tempfile.mkdtemp()
             output_dir = os.path.join(temp_dir, 'gemini_output')
@@ -500,7 +561,7 @@ with tab3:
                     workflow = GeminiWorkflowManager(
                         gemini_api_key=gemini_api_key,
                         dpi=dpi,
-                        model_name=model_name
+                        model_name=gemini_model
                     )
 
                     # 進捗コールバック
@@ -704,8 +765,32 @@ with tab5:
 
         with st.expander(f"⚙️ {preset_name}"):
             st.write("**説明:**", preset.get('description', '説明なし'))
-            st.write("**設定内容:**")
-            st.json({k: v for k, v in preset.items() if k not in ['description', 'created_at', 'updated_at']})
+
+            # 基本設定
+            st.write("**基本設定:**")
+            basic_settings = {
+                'chunk_size': preset.get('chunk_size', 800),
+                'create_toc': preset.get('create_toc', True),
+                'extract_images': preset.get('extract_images', True),
+                'generate_summary': preset.get('generate_summary', False),
+                'show_formulas': preset.get('show_formulas', True)
+            }
+            st.json(basic_settings)
+
+            # AI機能設定（いずれかのAI機能が設定されている場合に表示）
+            has_ai_settings = (
+                preset.get('ai_table_summary', False) or
+                preset.get('ai_image_description', False) or
+                preset.get('ai_generate_qa', False)
+            )
+            if has_ai_settings:
+                st.write("**AI機能設定:**")
+                ai_settings = {
+                    'ai_table_summary': preset.get('ai_table_summary', False),
+                    'ai_image_description': preset.get('ai_image_description', False),
+                    'ai_generate_qa': preset.get('ai_generate_qa', False)
+                }
+                st.json(ai_settings)
 
             # デフォルトプリセット以外は削除可能
             if preset_name not in ["デフォルト", "RAG最適化", "完全変換", "軽量版"]:
@@ -719,7 +804,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: gray; font-size: 0.8em;'>
-    Excel to Markdown Converter v2.0 (Phase 2) | RAG Optimized | Batch Processing | History Management
+    Excel to Markdown Converter v3.0 (Phase 3) | AI Features | RAG Optimized | Batch Processing | History Management
     </div>
     """,
     unsafe_allow_html=True
