@@ -38,8 +38,7 @@ class PresetManager:
                 "extract_images": True,
                 "generate_summary": False,
                 "show_formulas": True,
-                # Phase 3: AI機能設定
-                "enable_ai_features": False,
+                # Phase 3: AI機能設定（各機能は個別に制御）
                 "ai_table_summary": False,
                 "ai_image_description": False,
                 "ai_generate_qa": False,
@@ -51,8 +50,7 @@ class PresetManager:
                 "extract_images": False,
                 "generate_summary": True,
                 "show_formulas": False,
-                # Phase 3: AI機能設定
-                "enable_ai_features": False,
+                # Phase 3: AI機能設定（各機能は個別に制御）
                 "ai_table_summary": False,
                 "ai_image_description": False,
                 "ai_generate_qa": False,
@@ -64,8 +62,7 @@ class PresetManager:
                 "extract_images": True,
                 "generate_summary": True,
                 "show_formulas": True,
-                # Phase 3: AI機能設定
-                "enable_ai_features": False,
+                # Phase 3: AI機能設定（各機能は個別に制御）
                 "ai_table_summary": False,
                 "ai_image_description": False,
                 "ai_generate_qa": False,
@@ -77,8 +74,7 @@ class PresetManager:
                 "extract_images": False,
                 "generate_summary": False,
                 "show_formulas": False,
-                # Phase 3: AI機能設定
-                "enable_ai_features": False,
+                # Phase 3: AI機能設定（各機能は個別に制御）
                 "ai_table_summary": False,
                 "ai_image_description": False,
                 "ai_generate_qa": False,
