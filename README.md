@@ -35,6 +35,14 @@ RAGシステム用にExcelファイルをMarkdown形式に変換するWebアプ�
   - 完全変換（すべての情報を含む）
   - 軽量版（最小限の情報のみ）
 
+### Phase 3機能（AI統合）
+- ✅ **Gemini AI分析**: Google Gemini APIを使用した高度な分析
+  - シート内容の画像化
+  - AIによるセクション自動検出
+  - セクション別の詳細分析
+  - インテリジェントなMarkdown生成
+  - データインサイトの自動抽出
+
 ## システム要件
 
 - Python 3.9以上
@@ -79,6 +87,7 @@ streamlit run app.py
 
 ### 基本的な使用手順
 
+#### 標準変換モード
 1. **ファイルアップロード**: Excelファイル（.xlsx）をドラッグ&ドロップまたは選択
 2. **設定調整**: サイドバーで変換オプションを設定
    - 目次生成のON/OFF
@@ -88,24 +97,42 @@ streamlit run app.py
 4. **プレビュー**: 変換結果を確認（Markdown/レンダリング/メタデータ）
 5. **ダウンロード**: Markdownファイル、メタデータ、画像をダウンロード
 
+#### Gemini AI分析モード（Phase 3）
+1. **APIキー設定**: [Google AI Studio](https://makersuite.google.com/app/apikey)でGemini APIキーを取得し、入力
+2. **ファイルアップロード**: Excelファイル（.xlsx）を選択
+3. **分析オプション**: 画像解像度とGeminiモデル（Flash/Pro）を選択
+4. **AI分析実行**: 「Gemini分析を開始」ボタンをクリック
+5. **結果確認**:
+   - シートごとの画像表示
+   - AIによるセクション検出結果
+   - セクション別の詳細分析
+   - インサイト抽出
+6. **ダウンロード**: 統合分析レポート（Markdown）または全データ（ZIP）
+
 ## プロジェクト構造
 
 ```
 Excel-to-Md-Tool/
-├── app.py                      # Streamlit メインアプリ
+├── app.py                          # Streamlit メインアプリ
 ├── converter/
 │   ├── __init__.py
-│   ├── core.py                 # ExcelToMarkdownConverter クラス
-│   ├── sheet_parser.py         # シート解析ロジック
-│   ├── table_parser.py         # 表検出・変換
-│   ├── image_parser.py         # 画像・グラフ抽出
-│   ├── markdown_generator.py  # Markdown生成
-│   └── metadata_generator.py  # メタデータ生成
+│   ├── core.py                     # ExcelToMarkdownConverter クラス
+│   ├── sheet_parser.py             # シート解析ロジック
+│   ├── table_parser.py             # 表検出・変換
+│   ├── image_parser.py             # 画像・グラフ抽出
+│   ├── markdown_generator.py      # Markdown生成
+│   ├── metadata_generator.py      # メタデータ生成
+│   ├── sheet_to_image.py          # シート→画像変換（Phase 3）
+│   ├── gemini_analyzer.py         # Gemini API分析（Phase 3）
+│   └── gemini_workflow.py         # Gemini統合ワークフロー（Phase 3）
 ├── utils/
-│   └── __init__.py
-├── config.yaml                 # デフォルト設定
-├── requirements.txt            # 依存パッケージ
-└── README.md                   # このファイル
+│   ├── __init__.py
+│   ├── presets.py                  # プリセット管理
+│   ├── batch_processor.py          # バッチ処理
+│   └── history.py                  # 履歴管理
+├── config.yaml                     # デフォルト設定
+├── requirements.txt                # 依存パッケージ
+└── README.md                       # このファイル
 ```
 
 ## 設定
@@ -214,6 +241,10 @@ image:
 - **Pillow** - 画像処理
 - **PyYAML** - 設定ファイル管理
 - **tiktoken** - トークン数カウント（オプション）
+- **google-generativeai** - Gemini API統合（Phase 3）
+- **matplotlib** - シート画像化（Phase 3）
+- **pdf2image** - PDF処理（Phase 3）
+- **reportlab** - PDF生成（Phase 3）
 
 ## トラブルシューティング
 
@@ -232,6 +263,22 @@ image:
 - すべての出力はUTF-8エンコーディングです
 - 特殊文字が含まれる場合は、Excelファイルを確認してください
 
+### Gemini API関連
+
+#### APIキーエラー
+- Google AI Studioで正しいAPIキーを取得していることを確認してください
+- APIキーは有効化に数分かかる場合があります
+
+#### レート制限エラー
+- Gemini APIには無料枠の制限があります（1分あたり15リクエスト）
+- 処理するシート数が多い場合は、時間をおいて再実行してください
+- Gemini Proモデルを使用すると、より高い制限が適用される場合があります
+
+#### 分析結果が期待通りでない
+- 画像解像度（DPI）を上げると、より詳細な分析が可能になります
+- Flash→Proモデルに変更すると、より高精度な分析が可能です
+- 複雑なシートの場合、セクション検出が完全でない場合があります
+
 ## ロードマップ
 
 ### Phase 1: MVP（完了）
@@ -240,16 +287,24 @@ image:
 - ✅ 複数シート統合
 - ✅ メタデータ生成
 
-### Phase 2: 機能拡充（計画中）
-- ⬜ LLMを使用した表の自動要約
-- ⬜ グラフの説明自動生成
-- ⬜ バッチ処理機能
-- ⬜ 変換履歴管理
+### Phase 2: 機能拡充（完了）
+- ✅ Excel関数の実数値優先表示
+- ✅ プリセット管理
+- ✅ バッチ処理機能
+- ✅ 変換履歴管理
 
-### Phase 3: エンタープライズ機能（将来）
+### Phase 3: AI統合（完了）
+- ✅ Gemini API統合
+- ✅ シート画像化
+- ✅ AIによるセクション検出
+- ✅ AI分析によるMarkdown生成
+- ✅ データインサイト自動抽出
+
+### Phase 4: エンタープライズ機能（将来）
 - ⬜ API提供
 - ⬜ ユーザー認証
 - ⬜ クラウドストレージ連携
+- ⬜ 複数LLMサポート（Claude, GPT-4等）
 
 ## ライセンス
 

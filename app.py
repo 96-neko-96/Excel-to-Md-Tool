@@ -37,7 +37,7 @@ st.title("📊 Excel to Markdown Converter v2.0")
 st.markdown("**Phase 2機能搭載:** RAG最適化、バッチ処理、プリセット管理、変換履歴")
 
 # タブで機能を分離
-tab1, tab2, tab3, tab4 = st.tabs(["🔄 単一ファイル変換", "📦 バッチ処理", "📜 変換履歴", "⚙️ 設定管理"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["🔄 単一ファイル変換", "📦 バッチ処理", "🤖 Gemini AI分析", "📜 変換履歴", "⚙️ 設定管理"])
 
 # =============================================================================
 # タブ1: 単一ファイル変換
@@ -425,9 +425,227 @@ with tab2:
                     pass
 
 # =============================================================================
-# タブ3: 変換履歴
+# タブ3: Gemini AI分析
 # =============================================================================
 with tab3:
+    st.header("🤖 Gemini AI分析 - シートごとのPDF/画像変換＆AI分析")
+
+    # 注意書き
+    st.warning("⚠️ **注意**: この機能は試験的な機能です。AI分析の精度は100%ではなく、分析結果に誤りや不正確な情報が含まれる可能性があります。重要な用途での使用前には、必ず人間による確認・検証を行ってください。")
+
+    st.markdown("""
+    このモードでは、Excelシートを画像に変換し、Google Gemini AIを使用して以下を実行します：
+    1. **セクション検出**: シート内の論理的なセクションを自動検出
+    2. **セクション分析**: 各セクションの内容を詳細に分析
+    3. **Markdown生成**: 分析結果をMarkdown形式で出力
+    """)
+
+    # Gemini API キーの入力
+    st.markdown("---")
+    st.subheader("🔑 Gemini API設定")
+
+    gemini_api_key = st.text_input(
+        "Gemini APIキー",
+        type="password",
+        help="Google AI StudioでAPIキーを取得してください: https://makersuite.google.com/app/apikey"
+    )
+
+    if not gemini_api_key:
+        st.warning("⚠️ Gemini APIキーを入力してください")
+        st.info("💡 Gemini APIキーの取得方法:\n1. https://makersuite.google.com/app/apikey にアクセス\n2. 'Create API Key'をクリック\n3. 生成されたキーをコピー")
+
+    # Excelファイルアップロード
+    st.markdown("---")
+    st.subheader("📁 Excelファイルのアップロード")
+
+    gemini_uploaded_file = st.file_uploader(
+        "分析するExcelファイルを選択",
+        type=['xlsx'],
+        key="gemini_uploader",
+        help="シートごとに画像化してGemini AIで分析します"
+    )
+
+    # 分析オプション
+    with st.expander("⚙️ 分析オプション"):
+        col1, col2 = st.columns(2)
+        with col1:
+            dpi = st.slider("画像解像度 (DPI)", 100, 300, 150, 25)
+        with col2:
+            model_name = st.text_input(
+                "Geminiモデル",
+                value="gemini-2.5-flash-lite",
+                help="使用するGeminiモデル名を入力 (例: gemini-2.5-flash-lite, gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash-lite)"
+            )
+
+    # 分析実行
+    if gemini_uploaded_file and gemini_api_key:
+        if st.button("🚀 Gemini分析を開始", type="primary", use_container_width=True):
+            temp_dir = tempfile.mkdtemp()
+            output_dir = os.path.join(temp_dir, 'gemini_output')
+
+            try:
+                with st.spinner("Gemini AIで分析中..."):
+                    # 一時ファイル保存
+                    temp_input = os.path.join(temp_dir, gemini_uploaded_file.name)
+                    with open(temp_input, "wb") as f:
+                        f.write(gemini_uploaded_file.getbuffer())
+
+                    # プログレスバー
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+
+                    # ワークフローマネージャーの初期化
+                    from converter.gemini_workflow import GeminiWorkflowManager
+
+                    workflow = GeminiWorkflowManager(
+                        gemini_api_key=gemini_api_key,
+                        dpi=dpi,
+                        model_name=model_name
+                    )
+
+                    # 進捗コールバック
+                    def progress_callback(current, total, message):
+                        progress = int((current / total) * 100)
+                        progress_bar.progress(progress)
+                        status_text.text(message)
+
+                    # 分析実行
+                    status_text.text("📊 Excelファイルを読み込み中...")
+                    progress_bar.progress(10)
+
+                    results = workflow.process_excel_file(
+                        temp_input,
+                        output_dir,
+                        progress_callback
+                    )
+
+                    progress_bar.progress(100)
+                    status_text.text("✅ 分析完了！")
+
+                    # 結果の表示
+                    st.success("✅ Gemini AIによる分析が完了しました！")
+
+                    # サマリー
+                    summary = results["summary"]
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("総シート数", summary["total_sheets"])
+                    with col2:
+                        st.metric("処理成功", summary["processed_sheets"])
+                    with col3:
+                        st.metric("処理失敗", summary["failed_sheets"])
+
+                    # 各シートの結果
+                    st.markdown("---")
+                    st.subheader("📊 シート別分析結果")
+
+                    for sheet_name, sheet_data in results["sheets"].items():
+                        if "error" in sheet_data:
+                            with st.expander(f"❌ {sheet_name} - エラー"):
+                                st.error(f"エラー: {sheet_data['error']}")
+                            continue
+
+                        with st.expander(f"✅ {sheet_name}", expanded=False):
+                            tab_img, tab_analysis, tab_md = st.tabs(["🖼️ 画像", "📊 分析結果", "📝 Markdown"])
+
+                            # 画像タブ
+                            with tab_img:
+                                st.image(sheet_data["image_path"], caption=sheet_name, use_container_width=True)
+
+                            # 分析結果タブ
+                            with tab_analysis:
+                                analysis = sheet_data.get("analysis", {})
+
+                                # 全体の要約
+                                st.markdown("### 📋 全体の要約")
+                                st.info(analysis.get("overall_summary", ""))
+
+                                # 各セクション
+                                for section_data in analysis.get("sections", []):
+                                    section_info = section_data.get("section_info", {})
+                                    section_analysis = section_data.get("analysis", {})
+
+                                    st.markdown(f"#### {section_info.get('title', 'セクション')}")
+
+                                    col1, col2 = st.columns([1, 2])
+                                    with col1:
+                                        st.markdown(f"**行範囲:** {section_info.get('row_range', '不明')}")
+                                        st.markdown(f"**タイプ:** {section_info.get('content_type', '不明')}")
+                                    with col2:
+                                        st.markdown(f"**要約:** {section_analysis.get('summary', '')}")
+
+                                    # 重要ポイント
+                                    key_points = section_analysis.get('key_points', [])
+                                    if key_points:
+                                        st.markdown("**重要ポイント:**")
+                                        for point in key_points:
+                                            st.markdown(f"- {point}")
+
+                                    st.markdown("---")
+
+                            # Markdownタブ
+                            with tab_md:
+                                markdown_content = sheet_data.get("markdown", "")
+                                st.code(markdown_content, language="markdown")
+
+                    # ダウンロードセクション
+                    st.markdown("---")
+                    st.subheader("💾 ダウンロード")
+
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        # 統合Markdownファイル
+                        combined_md_path = os.path.join(output_dir, "combined_analysis.md")
+                        if os.path.exists(combined_md_path):
+                            with open(combined_md_path, 'r', encoding='utf-8') as f:
+                                combined_md = f.read()
+
+                            st.download_button(
+                                label="📄 統合分析レポート (Markdown)",
+                                data=combined_md,
+                                file_name=f"{os.path.splitext(gemini_uploaded_file.name)[0]}_gemini_analysis.md",
+                                mime="text/markdown",
+                                use_container_width=True
+                            )
+
+                    with col2:
+                        # すべてをZIPでダウンロード
+                        import zipfile
+                        from io import BytesIO
+
+                        zip_buffer = BytesIO()
+                        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                            for root, dirs, files in os.walk(output_dir):
+                                for file in files:
+                                    file_path = os.path.join(root, file)
+                                    arcname = os.path.relpath(file_path, output_dir)
+                                    zip_file.write(file_path, arcname)
+
+                        zip_buffer.seek(0)
+
+                        st.download_button(
+                            label="📦 すべてダウンロード (ZIP)",
+                            data=zip_buffer.getvalue(),
+                            file_name=f"{os.path.splitext(gemini_uploaded_file.name)[0]}_gemini_analysis.zip",
+                            mime="application/zip",
+                            use_container_width=True
+                        )
+
+            except Exception as e:
+                st.error(f"❌ エラーが発生しました: {str(e)}")
+                st.exception(e)
+
+            finally:
+                try:
+                    shutil.rmtree(temp_dir)
+                except:
+                    pass
+
+# =============================================================================
+# タブ4: 変換履歴
+# =============================================================================
+with tab4:
     st.header("📜 変換履歴")
 
     # 統計情報
@@ -471,9 +689,9 @@ with tab3:
         st.info("変換履歴がありません")
 
 # =============================================================================
-# タブ4: 設定管理
+# タブ5: 設定管理
 # =============================================================================
-with tab4:
+with tab5:
     st.header("⚙️ 設定管理")
 
     # プリセット一覧
