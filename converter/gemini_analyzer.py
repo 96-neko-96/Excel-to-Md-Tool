@@ -231,7 +231,7 @@ JSON形式で返してください。例：
 
     def analyze_full_sheet(self, image_path: str) -> Dict:
         """
-        シート全体を分析（セクション検出 + 各セクション分析）
+        シート全体を分析（最適化版：1回のAPI呼び出しで完了）
 
         Args:
             image_path: 分析する画像のパス
@@ -249,37 +249,124 @@ JSON形式で返してください。例：
                 "overall_summary": "全体の要約"
             }
         """
-        results = {
-            "sections": [],
-            "overall_summary": ""
-        }
-
         try:
-            # ステップ1: セクションを検出
-            sections = self.detect_sections(image_path)
-
-            # ステップ2: 各セクションを分析
-            # （実際には各セクションを切り出して分析する必要があるが、
-            # ここでは画像全体を各セクションのコンテキストで分析）
-            for section in sections:
-                analysis = self.analyze_section(image_path, section)
-
-                results["sections"].append({
-                    "section_info": section,
-                    "analysis": analysis
-                })
-
-            # ステップ3: 全体の要約を生成
+            # 画像を読み込み
             img = Image.open(image_path)
-            prompt = "この画像（Excelシート）全体の内容を100文字程度で要約してください。"
+
+            # 最適化：1回のAPI呼び出しで全ての分析を実行
+            prompt = """
+この画像はExcelシートを描画したものです。以下の分析を1つのJSON形式で返してください：
+
+1. **全体要約** (overall_summary): シート全体の内容を100-150文字で要約
+2. **セクション分析** (sections): 論理的なセクションごとに以下を分析
+   - section_id: セクションID（1から始まる連番）
+   - title: セクションのタイトル
+   - description: セクションの説明
+   - row_range: 行範囲（例: "1-5"）
+   - content_type: コンテンツタイプ（"table", "header", "summary", "data"など）
+   - summary: セクションの要約（50-100文字）
+   - details: 詳細な説明（100-200文字）
+   - key_points: 重要なポイント（配列、3-5個）
+   - data_structure: データ構造の説明
+   - insights: データから読み取れるインサイト
+   - markdown_table: 可能であればMarkdown形式のテーブル（なければ空文字列）
+
+JSON形式で返してください：
+{
+    "overall_summary": "シート全体の要約...",
+    "sections": [
+        {
+            "section_id": 1,
+            "title": "セクションタイトル",
+            "description": "セクションの説明",
+            "row_range": "1-5",
+            "content_type": "header",
+            "summary": "セクションの要約",
+            "details": "詳細な説明",
+            "key_points": ["ポイント1", "ポイント2", "ポイント3"],
+            "data_structure": "データ構造の説明",
+            "insights": "インサイト",
+            "markdown_table": ""
+        }
+    ]
+}
+"""
+
+            # Gemini APIで分析（1回のみ）
             response = self.model.generate_content([prompt, img])
-            results["overall_summary"] = response.text.strip()
+            response_text = response.text.strip()
+
+            # JSONとして解析
+            try:
+                # マークダウンのコードブロックを除去
+                if response_text.startswith("```json"):
+                    response_text = response_text[7:]
+                if response_text.startswith("```"):
+                    response_text = response_text[3:]
+                if response_text.endswith("```"):
+                    response_text = response_text[:-3]
+                response_text = response_text.strip()
+
+                result = json.loads(response_text)
+
+                # 結果を統一フォーマットに変換
+                formatted_result = {
+                    "overall_summary": result.get("overall_summary", ""),
+                    "sections": []
+                }
+
+                for section in result.get("sections", []):
+                    formatted_result["sections"].append({
+                        "section_info": {
+                            "section_id": section.get("section_id", 0),
+                            "title": section.get("title", ""),
+                            "description": section.get("description", ""),
+                            "row_range": section.get("row_range", ""),
+                            "content_type": section.get("content_type", "")
+                        },
+                        "analysis": {
+                            "summary": section.get("summary", ""),
+                            "details": section.get("details", ""),
+                            "key_points": section.get("key_points", []),
+                            "data_structure": section.get("data_structure", ""),
+                            "insights": section.get("insights", ""),
+                            "markdown_table": section.get("markdown_table", "")
+                        }
+                    })
+
+                return formatted_result
+
+            except json.JSONDecodeError as e:
+                print(f"JSON解析エラー: {e}")
+                print(f"レスポンス: {response_text[:500]}")
+                # フォールバック: テキストレスポンスをそのまま使用
+                return {
+                    "overall_summary": response_text[:200] if len(response_text) > 200 else response_text,
+                    "sections": [{
+                        "section_info": {
+                            "section_id": 1,
+                            "title": "全体",
+                            "description": "分析結果",
+                            "row_range": "全体",
+                            "content_type": "data"
+                        },
+                        "analysis": {
+                            "summary": response_text[:100] if len(response_text) > 100 else response_text,
+                            "details": response_text,
+                            "key_points": [],
+                            "data_structure": "不明",
+                            "insights": "",
+                            "markdown_table": ""
+                        }
+                    }]
+                }
 
         except Exception as e:
             print(f"シート全体分析エラー: {e}")
-            results["overall_summary"] = f"エラー: {str(e)}"
-
-        return results
+            return {
+                "overall_summary": f"エラー: {str(e)}",
+                "sections": []
+            }
 
     def generate_markdown_from_analysis(self, analysis_results: Dict, sheet_name: str) -> str:
         """
