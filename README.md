@@ -1,17 +1,17 @@
-# Excel to Markdown Converter v2.0
+# Excel to Markdown Converter v3.0
 
-RAGシステム用にExcelファイルをMarkdown形式に変換するWebアプリケーション
+RAGシステム用にExcelファイルをMarkdown形式に変換するWebアプリケーション（AI機能統合）
 
-![Version](https://img.shields.io/badge/version-2.0-blue)
+![Version](https://img.shields.io/badge/version-3.0-blue)
 ![Python](https://img.shields.io/badge/python-3.9+-green)
 ![License](https://img.shields.io/badge/license-MIT-yellow)
-![Phase](https://img.shields.io/badge/phase-2%20完了-success)
+![Phase](https://img.shields.io/badge/phase-3%20完了-success)
 
 ## 概要
 
 複数シート、表、グラフを含む複雑なExcelファイルを、RAGシステムで利用しやすいMarkdown形式に変換するツールです。Streamlitベースの直感的なWebUIを提供し、シート間の参照関係を保持しながら、ブック単位で1つのMarkdownファイルに統合します。
 
-**Phase 2完了**: プリセット管理、バッチ処理、変換履歴、Excel関数の実数値優先表示機能を追加しました。
+**Phase 3完了**: AI機能（表の自然言語要約、画像の説明自動生成、シートごとのQA生成）を追加しました。プリセット管理、バッチ処理、変換履歴、Excel関数の実数値優先表示機能も搭載しています。
 
 ## 主な機能
 
@@ -36,7 +36,13 @@ RAGシステム用にExcelファイルをMarkdown形式に変換するWebアプ�
   - 軽量版（最小限の情報のみ）
 
 ### Phase 3機能（AI統合）
-- ✅ **Gemini AI分析**: Google Gemini APIを使用した高度な分析
+- ✅ **AI機能統合**: Google Gemini APIを使用した高度な機能
+  - **表の自然言語要約**: 各表のデータを自然言語で要約
+  - **画像の説明自動生成**: 抽出した画像の内容をAIが自動説明
+  - **よくあるQA生成**: シートごとに想定される質問と回答を自動生成
+  - **Gemini API設定管理**: APIキーとモデル設定を保存・管理
+  - **チェックボックスによる機能切り替え**: 必要な機能のみを有効化可能
+- ✅ **Gemini AI分析モード**: シート画像化＆AI分析
   - シート内容の画像化
   - AIによるセクション自動検出
   - セクション別の詳細分析
@@ -87,15 +93,26 @@ streamlit run app.py
 
 ### 基本的な使用手順
 
-#### 標準変換モード
-1. **ファイルアップロード**: Excelファイル（.xlsx）をドラッグ&ドロップまたは選択
-2. **設定調整**: サイドバーで変換オプションを設定
+#### 標準変換モード（AI機能統合）
+1. **Gemini API設定**（AI機能を使用する場合）:
+   - サイドバーの「Gemini API設定」を展開
+   - [Google AI Studio](https://makersuite.google.com/app/apikey)でAPIキーを取得
+   - APIキーとモデル名を入力し、「API設定を保存」をクリック
+2. **ファイルアップロード**: Excelファイル（.xlsx）をドラッグ&ドロップまたは選択
+3. **基本設定調整**: サイドバーで変換オプションを設定
    - 目次生成のON/OFF
    - 画像抽出のON/OFF
    - チャンクサイズの調整（400-1500トークン）
-3. **変換実行**: 「変換開始」ボタンをクリック
-4. **プレビュー**: 変換結果を確認（Markdown/レンダリング/メタデータ）
-5. **ダウンロード**: Markdownファイル、メタデータ、画像をダウンロード
+4. **AI機能設定**（オプション）:
+   - 「AI機能を有効化」にチェック
+   - 必要なAI機能を選択:
+     - 📊 表の自然言語要約
+     - 🖼️ 画像の説明自動生成
+     - ❓ よくあるQA生成
+5. **変換実行**: 「変換開始」ボタンをクリック
+6. **プレビュー**: 変換結果を確認（Markdown/レンダリング/メタデータ）
+   - AI機能を有効にした場合、各シートに自然言語要約やQAが追加されます
+7. **ダウンロード**: Markdownファイル、メタデータ、画像をダウンロード
 
 #### Gemini AI分析モード（Phase 3）
 1. **APIキー設定**: [Google AI Studio](https://makersuite.google.com/app/apikey)でGemini APIキーを取得し、入力
@@ -294,10 +311,13 @@ image:
 - ✅ 変換履歴管理
 
 ### Phase 3: AI統合（完了）
-- ✅ Gemini API統合
-- ✅ シート画像化
+- ✅ Gemini API統合とAPI設定管理
+- ✅ 表の自然言語要約機能
+- ✅ 画像の説明自動生成機能
+- ✅ よくあるQA自動生成機能
+- ✅ AI機能のチェックボックス制御
+- ✅ シート画像化＆AI分析モード
 - ✅ AIによるセクション検出
-- ✅ AI分析によるMarkdown生成
 - ✅ データインサイト自動抽出
 
 ### Phase 4: エンタープライズ機能（将来）

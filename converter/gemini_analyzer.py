@@ -444,3 +444,174 @@ JSON形式で返してください：
             md_lines.append("")
 
         return "\n".join(md_lines)
+
+    # ========================================
+    # Phase 3: 高度なAI機能
+    # ========================================
+
+    def generate_table_summary(self, table_data: str) -> str:
+        """
+        Phase 3: 表の自然言語要約を生成
+
+        Args:
+            table_data: Markdown形式の表データ
+
+        Returns:
+            自然言語による表の要約
+        """
+        try:
+            prompt = f"""
+以下のMarkdown形式の表を分析して、自然言語で要約してください。
+
+表データ:
+{table_data}
+
+要約は以下の観点を含めてください：
+- 表の目的や内容
+- データの特徴や傾向
+- 重要な数値やポイント
+- 全体的な構造
+
+200-300文字程度で要約してください。
+"""
+            response = self.model.generate_content(prompt)
+            return response.text.strip()
+
+        except Exception as e:
+            print(f"表の要約生成エラー: {e}")
+            return f"表の要約を生成できませんでした: {str(e)}"
+
+    def generate_image_description(self, image_path: str) -> str:
+        """
+        Phase 3: 画像の説明を自動生成
+
+        Args:
+            image_path: 画像ファイルのパス
+
+        Returns:
+            画像の説明文
+        """
+        try:
+            img = Image.open(image_path)
+
+            prompt = """
+この画像を詳しく説明してください。
+
+以下の観点を含めてください：
+- 画像の種類（グラフ、図、チャート、イラストなど）
+- 主な内容や表現されているもの
+- 色使いやデザインの特徴
+- 読み取れるデータや情報
+- 画像から分かる重要なポイント
+
+100-200文字程度で説明してください。
+"""
+            response = self.model.generate_content([prompt, img])
+            return response.text.strip()
+
+        except Exception as e:
+            print(f"画像の説明生成エラー: {e}")
+            return f"画像の説明を生成できませんでした: {str(e)}"
+
+    def generate_qa_for_sheet(self, sheet_content: str, sheet_name: str = None) -> List[Dict[str, str]]:
+        """
+        Phase 3: シートの内容に基づいてよくあるQAを生成
+
+        Args:
+            sheet_content: シートの内容（Markdown形式）
+            sheet_name: シート名（オプション）
+
+        Returns:
+            QAのリスト
+            [
+                {"question": "質問1", "answer": "回答1"},
+                {"question": "質問2", "answer": "回答2"},
+                ...
+            ]
+        """
+        try:
+            sheet_info = f"（シート名: {sheet_name}）" if sheet_name else ""
+
+            prompt = f"""
+以下のシート内容{sheet_info}を分析して、よくある質問（FAQ）とその回答を5-7個生成してください。
+
+シート内容:
+{sheet_content[:3000]}  # 最初の3000文字に制限
+
+各Q&Aは以下のJSON形式で返してください：
+{{
+    "qa_list": [
+        {{
+            "question": "このシートにはどのようなデータが含まれていますか？",
+            "answer": "このシートには..."
+        }},
+        {{
+            "question": "主要な指標は何ですか？",
+            "answer": "主要な指標として..."
+        }}
+    ]
+}}
+
+質問は実用的で、シートの内容を理解するのに役立つものにしてください。
+"""
+            response = self.model.generate_content(prompt)
+            response_text = response.text.strip()
+
+            # JSONとして解析
+            try:
+                # マークダウンのコードブロックを除去
+                if response_text.startswith("```json"):
+                    response_text = response_text[7:]
+                if response_text.startswith("```"):
+                    response_text = response_text[3:]
+                if response_text.endswith("```"):
+                    response_text = response_text[:-3]
+                response_text = response_text.strip()
+
+                result = json.loads(response_text)
+                return result.get("qa_list", [])
+
+            except json.JSONDecodeError as e:
+                print(f"QA JSON解析エラー: {e}")
+                # フォールバック: テキストを簡易的にパース
+                lines = response_text.split('\n')
+                qa_list = []
+                current_q = None
+                current_a = []
+
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith('Q:') or line.startswith('質問'):
+                        if current_q and current_a:
+                            qa_list.append({
+                                "question": current_q,
+                                "answer": " ".join(current_a)
+                            })
+                        current_q = line.split(':', 1)[-1].strip()
+                        current_a = []
+                    elif line.startswith('A:') or line.startswith('回答'):
+                        current_a.append(line.split(':', 1)[-1].strip())
+                    elif current_q and line:
+                        current_a.append(line)
+
+                if current_q and current_a:
+                    qa_list.append({
+                        "question": current_q,
+                        "answer": " ".join(current_a)
+                    })
+
+                return qa_list if qa_list else [
+                    {
+                        "question": "このシートの内容は？",
+                        "answer": response_text[:200]
+                    }
+                ]
+
+        except Exception as e:
+            print(f"QA生成エラー: {e}")
+            return [
+                {
+                    "question": "Q&A生成エラー",
+                    "answer": f"Q&Aを生成できませんでした: {str(e)}"
+                }
+            ]

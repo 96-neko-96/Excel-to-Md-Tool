@@ -11,9 +11,11 @@ from datetime import datetime
 class PresetManager:
     """プリセット設定管理クラス"""
 
-    def __init__(self, presets_file: str = "presets.json"):
+    def __init__(self, presets_file: str = "presets.json", config_file: str = "config.json"):
         self.presets_file = presets_file
+        self.config_file = config_file
         self.presets = self._load_presets()
+        self.config = self._load_config()
 
     def _load_presets(self) -> Dict[str, Any]:
         """プリセットファイルを読み込む"""
@@ -36,6 +38,11 @@ class PresetManager:
                 "extract_images": True,
                 "generate_summary": False,
                 "show_formulas": True,
+                # Phase 3: AI機能設定
+                "enable_ai_features": False,
+                "ai_table_summary": False,
+                "ai_image_description": False,
+                "ai_generate_qa": False,
                 "description": "標準的な変換設定"
             },
             "RAG最適化": {
@@ -44,6 +51,11 @@ class PresetManager:
                 "extract_images": False,
                 "generate_summary": True,
                 "show_formulas": False,
+                # Phase 3: AI機能設定
+                "enable_ai_features": False,
+                "ai_table_summary": False,
+                "ai_image_description": False,
+                "ai_generate_qa": False,
                 "description": "RAGシステム向けの最適化設定（画像なし、要約あり）"
             },
             "完全変換": {
@@ -52,6 +64,11 @@ class PresetManager:
                 "extract_images": True,
                 "generate_summary": True,
                 "show_formulas": True,
+                # Phase 3: AI機能設定
+                "enable_ai_features": False,
+                "ai_table_summary": False,
+                "ai_image_description": False,
+                "ai_generate_qa": False,
                 "description": "すべての情報を含む完全変換"
             },
             "軽量版": {
@@ -60,6 +77,11 @@ class PresetManager:
                 "extract_images": False,
                 "generate_summary": False,
                 "show_formulas": False,
+                # Phase 3: AI機能設定
+                "enable_ai_features": False,
+                "ai_table_summary": False,
+                "ai_image_description": False,
+                "ai_generate_qa": False,
                 "description": "最小限の情報のみ（表データのみ）"
             }
         }
@@ -108,3 +130,43 @@ class PresetManager:
             self.presets[name]["description"] = description
         self.presets[name]["updated_at"] = datetime.now().isoformat()
         self.save_presets()
+
+    # Phase 3: グローバル設定管理
+    def _load_config(self) -> Dict[str, Any]:
+        """グローバル設定を読み込む"""
+        if os.path.exists(self.config_file):
+            try:
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"設定の読み込みエラー: {e}")
+                return self._get_default_config()
+        else:
+            return self._get_default_config()
+
+    def _get_default_config(self) -> Dict[str, Any]:
+        """デフォルトのグローバル設定を取得"""
+        return {
+            "gemini_api_key": "",
+            "gemini_model": "gemini-2.5-flash-lite",
+            "gemini_dpi": 150
+        }
+
+    def save_config(self):
+        """グローバル設定をファイルに保存"""
+        try:
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            raise IOError(f"設定の保存に失敗しました: {e}")
+
+    def get_config(self, key: str = None) -> Any:
+        """グローバル設定を取得"""
+        if key is None:
+            return self.config.copy()
+        return self.config.get(key)
+
+    def update_config(self, key: str, value: Any):
+        """グローバル設定を更新"""
+        self.config[key] = value
+        self.save_config()
