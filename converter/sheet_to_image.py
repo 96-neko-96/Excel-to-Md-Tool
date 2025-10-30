@@ -5,9 +5,11 @@ Excel Sheet to Image Converter
 
 import openpyxl
 from openpyxl.drawing.image import Image as XLImage
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.table import Table
+from matplotlib import font_manager
 from PIL import Image, ImageDraw, ImageFont
 import pandas as pd
 import numpy as np
@@ -16,6 +18,41 @@ import os
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.pdfgen import canvas
 from io import BytesIO
+
+
+def setup_japanese_font():
+    """日本語フォントの設定"""
+    # 日本語フォントの候補リスト
+    japanese_fonts = [
+        'Noto Sans CJK JP',
+        'Noto Sans JP',
+        'IPAexGothic',
+        'IPAGothic',
+        'Hiragino Sans',
+        'Yu Gothic',
+        'Meiryo',
+        'MS Gothic',
+        'TakaoPGothic',
+        'VL Gothic',
+        'DejaVu Sans'
+    ]
+
+    # 利用可能なフォントを取得
+    available_fonts = [f.name for f in font_manager.fontManager.ttflist]
+
+    # 日本語フォントを探す
+    for font in japanese_fonts:
+        if font in available_fonts:
+            matplotlib.rcParams['font.family'] = font
+            return font
+
+    # フォントが見つからない場合はsans-serifのフォールバック
+    matplotlib.rcParams['font.family'] = 'sans-serif'
+    matplotlib.rcParams['font.sans-serif'] = japanese_fonts + ['DejaVu Sans']
+    # マイナス記号の文字化け対策
+    matplotlib.rcParams['axes.unicode_minus'] = False
+
+    return 'sans-serif'
 
 
 class SheetToImageConverter:
@@ -31,6 +68,9 @@ class SheetToImageConverter:
         """
         self.dpi = dpi
         self.page_size = page_size
+
+        # 日本語フォントの設定
+        self.font_name = setup_japanese_font()
 
     def excel_to_images(self, excel_path: str, output_dir: str) -> Dict[str, List[str]]:
         """
@@ -182,17 +222,44 @@ class SheetToImageConverter:
         img = Image.new('RGB', (800, 600), color='white')
         draw = ImageDraw.Draw(img)
 
-        # テキストを描画
-        try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24)
-        except:
-            font = ImageFont.load_default()
+        # 日本語対応フォントを試す
+        font_paths = [
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/truetype/fonts-japanese-gothic.ttf",
+            "/usr/share/fonts/truetype/takao-gothic/TakaoPGothic.ttf",
+            "/usr/share/fonts/truetype/vlgothic/VL-Gothic-Regular.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc",
+            "C:\\Windows\\Fonts\\msgothic.ttc",
+            "C:\\Windows\\Fonts\\YuGothR.ttc"
+        ]
+
+        font = None
+        for font_path in font_paths:
+            try:
+                font = ImageFont.truetype(font_path, 24)
+                break
+            except:
+                continue
+
+        if font is None:
+            try:
+                font = ImageFont.load_default()
+            except:
+                font = ImageFont.load_default()
 
         text = f"空のシート: {sheet_name}"
         # テキストの位置を計算（中央）
-        bbox = draw.textbbox((0, 0), text, font=font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
+        try:
+            bbox = draw.textbbox((0, 0), text, font=font)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+        except:
+            # フォールバック
+            text_width = len(text) * 12
+            text_height = 24
+
         x = (800 - text_width) / 2
         y = (600 - text_height) / 2
 
