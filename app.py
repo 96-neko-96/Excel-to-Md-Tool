@@ -31,6 +31,462 @@ if 'history_manager' not in st.session_state:
     st.session_state.history_manager = HistoryManager()
 if 'current_preset' not in st.session_state:
     st.session_state.current_preset = "デフォルト"
+if 'theme' not in st.session_state:
+    st.session_state.theme = "light"
+
+# カスタムテーマのCSS適用
+def apply_theme():
+    if st.session_state.theme == "dark":
+        st.markdown("""
+        <style>
+        /* ダークモードのスタイル */
+        .stApp {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+
+        /* サイドバー */
+        [data-testid="stSidebar"] {
+            background-color: #2d2d2d;
+        }
+
+        [data-testid="stSidebar"] .stMarkdown {
+            color: #e0e0e0;
+        }
+
+        /* ヘッダー */
+        h1, h2, h3, h4, h5, h6 {
+            color: #ffffff !important;
+        }
+
+        /* テキスト */
+        p, li, span, div {
+            color: #e0e0e0 !important;
+        }
+
+        /* ボタン */
+        .stButton > button {
+            background-color: #4a4a4a;
+            color: #ffffff;
+            border: 1px solid #666666;
+        }
+
+        .stButton > button:hover {
+            background-color: #5a5a5a;
+            border-color: #777777;
+        }
+
+        .stButton > button[kind="primary"] {
+            background-color: #0066cc;
+            color: #ffffff;
+        }
+
+        .stButton > button[kind="primary"]:hover {
+            background-color: #0077ee;
+        }
+
+        /* 入力フィールド */
+        .stTextInput > div > div > input,
+        .stSelectbox > div > div > select,
+        .stTextArea > div > div > textarea {
+            background-color: #3a3a3a;
+            color: #ffffff;
+            border-color: #555555;
+        }
+
+        /* チェックボックス */
+        .stCheckbox > label {
+            color: #e0e0e0 !important;
+        }
+
+        /* スライダー */
+        .stSlider > div > div > div {
+            color: #e0e0e0;
+        }
+
+        /* タブ */
+        .stTabs [data-baseweb="tab-list"] {
+            background-color: #2d2d2d;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            color: #b0b0b0;
+        }
+
+        .stTabs [aria-selected="true"] {
+            color: #ffffff !important;
+            background-color: #3a3a3a;
+        }
+
+        /* エクスパンダー */
+        .streamlit-expanderHeader {
+            background-color: #2d2d2d;
+            color: #e0e0e0 !important;
+        }
+
+        .streamlit-expanderContent {
+            background-color: #1a1a1a;
+        }
+
+        /* メトリクス */
+        [data-testid="stMetricValue"] {
+            color: #ffffff !important;
+        }
+
+        [data-testid="stMetricLabel"] {
+            color: #b0b0b0 !important;
+        }
+
+        /* 情報ボックス */
+        .stAlert {
+            background-color: #2d2d2d;
+            color: #e0e0e0;
+        }
+
+        /* コードブロック */
+        .stCodeBlock {
+            background-color: #2d2d2d !important;
+        }
+
+        .stCodeBlock > div {
+            background-color: #2d2d2d !important;
+        }
+
+        code {
+            color: #ffcc66 !important;
+            background-color: #2d2d2d !important;
+        }
+
+        pre {
+            background-color: #2d2d2d !important;
+            color: #e0e0e0 !important;
+        }
+
+        pre code {
+            background-color: #2d2d2d !important;
+            color: #e0e0e0 !important;
+        }
+
+        /* コードブロックの詳細スタイル */
+        [data-testid="stCodeBlock"] {
+            background-color: #2d2d2d !important;
+        }
+
+        [data-testid="stCodeBlock"] > div {
+            background-color: #2d2d2d !important;
+        }
+
+        [data-testid="stCodeBlock"] pre {
+            background-color: #2d2d2d !important;
+            color: #e0e0e0 !important;
+        }
+
+        [data-testid="stCodeBlock"] code {
+            background-color: #2d2d2d !important;
+            color: #e0e0e0 !important;
+        }
+
+        /* JSONビュー */
+        [data-testid="stJson"] {
+            background-color: #2d2d2d !important;
+        }
+
+        [data-testid="stJson"] > div {
+            background-color: #2d2d2d !important;
+        }
+
+        [data-testid="stJson"] pre {
+            background-color: #2d2d2d !important;
+            color: #e0e0e0 !important;
+        }
+
+        /* JSONの各要素 */
+        .stJson {
+            background-color: #2d2d2d !important;
+        }
+
+        .stJson pre {
+            background-color: #2d2d2d !important;
+            color: #e0e0e0 !important;
+        }
+
+        /* st.codeで表示されるコード */
+        .element-container pre {
+            background-color: #2d2d2d !important;
+            color: #e0e0e0 !important;
+        }
+
+        .element-container code {
+            background-color: #2d2d2d !important;
+            color: #e0e0e0 !important;
+        }
+
+        /* Streamlitの埋め込みコードエディタ */
+        .ace_editor {
+            background-color: #2d2d2d !important;
+        }
+
+        .ace_gutter {
+            background-color: #1a1a1a !important;
+            color: #b0b0b0 !important;
+        }
+
+        .ace_content {
+            background-color: #2d2d2d !important;
+        }
+
+
+        /* ファイルアップローダー */
+        [data-testid="stFileUploader"] {
+            background-color: #2d2d2d;
+        }
+
+        [data-testid="stFileUploader"] label {
+            color: #e0e0e0 !important;
+        }
+
+        /* プログレスバー */
+        .stProgress > div > div > div {
+            background-color: #0066cc;
+        }
+
+        /* ダウンロードボタン */
+        .stDownloadButton > button {
+            background-color: #4a4a4a;
+            color: #ffffff;
+            border: 1px solid #666666;
+        }
+
+        .stDownloadButton > button:hover {
+            background-color: #5a5a5a;
+        }
+
+        /* リンク */
+        a {
+            color: #66b3ff !important;
+        }
+
+        a:hover {
+            color: #99ccff !important;
+        }
+
+        /* データフレーム */
+        .dataframe {
+            background-color: #2d2d2d;
+            color: #e0e0e0;
+        }
+
+        /* 選択ボックス */
+        [data-baseweb="select"] {
+            background-color: #3a3a3a;
+        }
+
+        [data-baseweb="select"] > div {
+            background-color: #3a3a3a;
+            color: #ffffff;
+        }
+
+        /* テーマ切り替えボタンのスタイル */
+        .theme-toggle-button {
+            background-color: #4a4a4a;
+            color: #ffffff;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #666666;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle-button:hover {
+            background-color: #5a5a5a;
+            border-color: #777777;
+        }
+
+        /* ツールチップ */
+        [data-testid="stTooltipIcon"],
+        .stTooltipIcon {
+            color: #e0e0e0 !important;
+        }
+
+        [role="tooltip"] {
+            background-color: #2d2d2d !important;
+            color: #ffffff !important;
+            border: 1px solid #555555 !important;
+        }
+
+        /* ツールチップのコンテンツ */
+        [role="tooltip"] > div {
+            background-color: #2d2d2d !important;
+            color: #ffffff !important;
+        }
+
+        /* ツールチップの矢印 */
+        [role="tooltip"]::before,
+        [role="tooltip"]::after {
+            border-color: #2d2d2d transparent transparent transparent !important;
+        }
+
+        /* Streamlitのポップオーバー全般 */
+        [data-baseweb="popover"] {
+            background-color: #2d2d2d !important;
+        }
+
+        [data-baseweb="popover"] > div {
+            background-color: #2d2d2d !important;
+            color: #ffffff !important;
+        }
+
+        /* メニュー項目 */
+        [data-baseweb="menu"] {
+            background-color: #2d2d2d !important;
+        }
+
+        [data-baseweb="menu"] li {
+            background-color: #2d2d2d !important;
+            color: #ffffff !important;
+        }
+
+        [data-baseweb="menu"] li:hover {
+            background-color: #3a3a3a !important;
+            color: #ffffff !important;
+        }
+
+        /* ヘッダーのメニュー（３点リーダー） */
+        [data-testid="stHeader"] [data-baseweb="popover"] {
+            background-color: #2d2d2d !important;
+        }
+
+        [data-testid="stHeader"] [data-baseweb="popover"] > div {
+            background-color: #2d2d2d !important;
+        }
+
+        [data-testid="stHeader"] [data-baseweb="menu"] {
+            background-color: #2d2d2d !important;
+        }
+
+        [data-testid="stHeader"] [data-baseweb="menu"] li {
+            background-color: #2d2d2d !important;
+            color: #ffffff !important;
+        }
+
+        [data-testid="stHeader"] [data-baseweb="menu"] li:hover {
+            background-color: #3a3a3a !important;
+        }
+
+        /* ツールチップ内のテキスト */
+        .stTooltipContent,
+        [data-baseweb="tooltip"] {
+            background-color: #2d2d2d !important;
+            color: #ffffff !important;
+        }
+
+        [data-baseweb="tooltip"] > div {
+            background-color: #2d2d2d !important;
+            color: #ffffff !important;
+        }
+
+        /* ヘッダー領域 */
+        header[data-testid="stHeader"] {
+            background-color: #1a1a1a !important;
+        }
+
+        /* メインヘッダー部分 */
+        .main .block-container {
+            background-color: transparent;
+        }
+
+        /* ファイルアップローダーの改善 */
+        [data-testid="stFileUploader"] section {
+            background-color: #2d2d2d !important;
+            border-color: #555555 !important;
+        }
+
+        [data-testid="stFileUploader"] section > div {
+            color: #e0e0e0 !important;
+        }
+
+        [data-testid="stFileUploader"] section button {
+            background-color: #4a4a4a !important;
+            color: #ffffff !important;
+            border-color: #666666 !important;
+        }
+
+        [data-testid="stFileUploader"] small {
+            color: #b0b0b0 !important;
+        }
+
+        /* エクスパンダーの詳細スタイル */
+        .streamlit-expanderHeader p {
+            color: #e0e0e0 !important;
+        }
+
+        details summary {
+            background-color: #2d2d2d !important;
+            color: #e0e0e0 !important;
+        }
+
+        details[open] summary {
+            background-color: #2d2d2d !important;
+            color: #ffffff !important;
+        }
+
+        /* Helpアイコン */
+        .stTextInput label [data-testid="stTooltipHoverTarget"],
+        .stSelectbox label [data-testid="stTooltipHoverTarget"],
+        .stCheckbox label [data-testid="stTooltipHoverTarget"] {
+            color: #b0b0b0 !important;
+        }
+
+        /* 入力フィールドのラベル */
+        .stTextInput label,
+        .stSelectbox label,
+        .stTextArea label,
+        .stCheckbox label {
+            color: #e0e0e0 !important;
+        }
+
+        /* st.infoなどの情報ボックス */
+        .stAlert > div {
+            background-color: #2d2d2d !important;
+        }
+
+        .stAlert p {
+            color: #e0e0e0 !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <style>
+        /* ライトモードのスタイル（デフォルトを維持） */
+        .stApp {
+            background-color: #ffffff;
+            color: #262730;
+        }
+
+        [data-testid="stSidebar"] {
+            background-color: #f0f2f6;
+        }
+
+        /* テーマ切り替えボタンのスタイル */
+        .theme-toggle-button {
+            background-color: #f0f2f6;
+            color: #262730;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #d0d0d0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle-button:hover {
+            background-color: #e0e2e6;
+            border-color: #b0b0b0;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+apply_theme()
 
 # ヘッダー
 st.title("📊 Excel to Markdown Converter v3.0")
@@ -46,6 +502,17 @@ with tab1:
     # サイドバー: 設定パネル
     with st.sidebar:
         st.header("⚙️ 変換設定")
+
+        # テーマ切り替え
+        st.markdown("---")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("### 🎨 テーマ設定")
+        with col2:
+            theme_icon = "🌙" if st.session_state.theme == "light" else "☀️"
+            if st.button(theme_icon, help="テーマを切り替え", use_container_width=True):
+                st.session_state.theme = "dark" if st.session_state.theme == "light" else "light"
+                st.rerun()
 
         # プリセット選択
         preset_names = st.session_state.preset_manager.get_preset_names()
