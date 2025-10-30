@@ -145,13 +145,96 @@ def apply_theme():
 
         /* コードブロック */
         .stCodeBlock {
-            background-color: #2d2d2d;
+            background-color: #2d2d2d !important;
+        }
+
+        .stCodeBlock > div {
+            background-color: #2d2d2d !important;
         }
 
         code {
             color: #ffcc66 !important;
             background-color: #2d2d2d !important;
         }
+
+        pre {
+            background-color: #2d2d2d !important;
+            color: #e0e0e0 !important;
+        }
+
+        pre code {
+            background-color: #2d2d2d !important;
+            color: #e0e0e0 !important;
+        }
+
+        /* コードブロックの詳細スタイル */
+        [data-testid="stCodeBlock"] {
+            background-color: #2d2d2d !important;
+        }
+
+        [data-testid="stCodeBlock"] > div {
+            background-color: #2d2d2d !important;
+        }
+
+        [data-testid="stCodeBlock"] pre {
+            background-color: #2d2d2d !important;
+            color: #e0e0e0 !important;
+        }
+
+        [data-testid="stCodeBlock"] code {
+            background-color: #2d2d2d !important;
+            color: #e0e0e0 !important;
+        }
+
+        /* JSONビュー */
+        [data-testid="stJson"] {
+            background-color: #2d2d2d !important;
+        }
+
+        [data-testid="stJson"] > div {
+            background-color: #2d2d2d !important;
+        }
+
+        [data-testid="stJson"] pre {
+            background-color: #2d2d2d !important;
+            color: #e0e0e0 !important;
+        }
+
+        /* JSONの各要素 */
+        .stJson {
+            background-color: #2d2d2d !important;
+        }
+
+        .stJson pre {
+            background-color: #2d2d2d !important;
+            color: #e0e0e0 !important;
+        }
+
+        /* st.codeで表示されるコード */
+        .element-container pre {
+            background-color: #2d2d2d !important;
+            color: #e0e0e0 !important;
+        }
+
+        .element-container code {
+            background-color: #2d2d2d !important;
+            color: #e0e0e0 !important;
+        }
+
+        /* Streamlitの埋め込みコードエディタ */
+        .ace_editor {
+            background-color: #2d2d2d !important;
+        }
+
+        .ace_gutter {
+            background-color: #1a1a1a !important;
+            color: #b0b0b0 !important;
+        }
+
+        .ace_content {
+            background-color: #2d2d2d !important;
+        }
+
 
         /* ファイルアップローダー */
         [data-testid="stFileUploader"] {
