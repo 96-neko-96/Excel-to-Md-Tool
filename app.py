@@ -218,6 +218,87 @@ def apply_theme():
             background-color: #5a5a5a;
             border-color: #777777;
         }
+
+        /* ツールチップ */
+        [data-testid="stTooltipIcon"],
+        .stTooltipIcon {
+            color: #e0e0e0 !important;
+        }
+
+        [role="tooltip"] {
+            background-color: #2d2d2d !important;
+            color: #ffffff !important;
+            border: 1px solid #555555 !important;
+        }
+
+        /* ヘッダー領域 */
+        header[data-testid="stHeader"] {
+            background-color: #1a1a1a !important;
+        }
+
+        /* メインヘッダー部分 */
+        .main .block-container {
+            background-color: transparent;
+        }
+
+        /* ファイルアップローダーの改善 */
+        [data-testid="stFileUploader"] section {
+            background-color: #2d2d2d !important;
+            border-color: #555555 !important;
+        }
+
+        [data-testid="stFileUploader"] section > div {
+            color: #e0e0e0 !important;
+        }
+
+        [data-testid="stFileUploader"] section button {
+            background-color: #4a4a4a !important;
+            color: #ffffff !important;
+            border-color: #666666 !important;
+        }
+
+        [data-testid="stFileUploader"] small {
+            color: #b0b0b0 !important;
+        }
+
+        /* エクスパンダーの詳細スタイル */
+        .streamlit-expanderHeader p {
+            color: #e0e0e0 !important;
+        }
+
+        details summary {
+            background-color: #2d2d2d !important;
+            color: #e0e0e0 !important;
+        }
+
+        details[open] summary {
+            background-color: #2d2d2d !important;
+            color: #ffffff !important;
+        }
+
+        /* Helpアイコン */
+        .stTextInput label [data-testid="stTooltipHoverTarget"],
+        .stSelectbox label [data-testid="stTooltipHoverTarget"],
+        .stCheckbox label [data-testid="stTooltipHoverTarget"] {
+            color: #b0b0b0 !important;
+        }
+
+        /* 入力フィールドのラベル */
+        .stTextInput label,
+        .stSelectbox label,
+        .stTextArea label,
+        .stCheckbox label {
+            color: #e0e0e0 !important;
+        }
+
+        /* st.infoなどの情報ボックス */
+        .stAlert > div {
+            background-color: #2d2d2d !important;
+        }
+
+        .stAlert p {
+            color: #e0e0e0 !important;
+        }
         </style>
         """, unsafe_allow_html=True)
     else:
