@@ -231,6 +231,77 @@ def apply_theme():
             border: 1px solid #555555 !important;
         }
 
+        /* ツールチップのコンテンツ */
+        [role="tooltip"] > div {
+            background-color: #2d2d2d !important;
+            color: #ffffff !important;
+        }
+
+        /* ツールチップの矢印 */
+        [role="tooltip"]::before,
+        [role="tooltip"]::after {
+            border-color: #2d2d2d transparent transparent transparent !important;
+        }
+
+        /* Streamlitのポップオーバー全般 */
+        [data-baseweb="popover"] {
+            background-color: #2d2d2d !important;
+        }
+
+        [data-baseweb="popover"] > div {
+            background-color: #2d2d2d !important;
+            color: #ffffff !important;
+        }
+
+        /* メニュー項目 */
+        [data-baseweb="menu"] {
+            background-color: #2d2d2d !important;
+        }
+
+        [data-baseweb="menu"] li {
+            background-color: #2d2d2d !important;
+            color: #ffffff !important;
+        }
+
+        [data-baseweb="menu"] li:hover {
+            background-color: #3a3a3a !important;
+            color: #ffffff !important;
+        }
+
+        /* ヘッダーのメニュー（３点リーダー） */
+        [data-testid="stHeader"] [data-baseweb="popover"] {
+            background-color: #2d2d2d !important;
+        }
+
+        [data-testid="stHeader"] [data-baseweb="popover"] > div {
+            background-color: #2d2d2d !important;
+        }
+
+        [data-testid="stHeader"] [data-baseweb="menu"] {
+            background-color: #2d2d2d !important;
+        }
+
+        [data-testid="stHeader"] [data-baseweb="menu"] li {
+            background-color: #2d2d2d !important;
+            color: #ffffff !important;
+        }
+
+        [data-testid="stHeader"] [data-baseweb="menu"] li:hover {
+            background-color: #3a3a3a !important;
+        }
+
+        /* ツールチップ内のテキスト */
+        .stTooltipContent,
+        [data-baseweb="tooltip"] {
+            background-color: #2d2d2d !important;
+            color: #ffffff !important;
+        }
+
+        [data-baseweb="tooltip"] > div {
+            background-color: #2d2d2d !important;
+            color: #ffffff !important;
+        }
+
         /* ヘッダー領域 */
         header[data-testid="stHeader"] {
             background-color: #1a1a1a !important;
