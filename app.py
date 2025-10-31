@@ -490,7 +490,7 @@ apply_theme()
 
 # ヘッダー
 st.title("📊 Excel to Markdown Converter v3.0")
-st.markdown("**Phase 3機能搭載:** AI機能統合（表の要約、画像説明、QA生成）、RAG最適化、バッチ処理、プリセット管理、変換履歴")
+st.markdown("**ExcelファイルをRAGシステム用のMarkdownに変換** - AIが表データを自然言語で要約し、画像を説明、想定Q&Aを自動生成。複数ファイルの一括処理や変換履歴管理にも対応。")
 
 # タブで機能を分離
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🔄 単一ファイル変換", "📦 バッチ処理", "🤖 Gemini AI分析", "📜 変換履歴", "⚙️ 設定管理"])
