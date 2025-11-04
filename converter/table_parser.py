@@ -6,6 +6,8 @@ from typing import List, Tuple, Dict, Any
 import pandas as pd
 import openpyxl
 from openpyxl.utils import get_column_letter
+from datetime import datetime, timedelta
+import re
 
 
 class TableParser:
@@ -41,19 +43,97 @@ class TableParser:
                         'markdown': md_table  # Phase 3: AI機能用にMarkdownを保存
                     })
         else:
-            # テーブルオブジェクトがない場合は、使用範囲全体を1つのテーブルとして扱う
+            # テーブルオブジェクトがない場合は、空白行で区切られた複数の表を検出
             if sheet.dimensions and sheet.dimensions != "A1:A1":
-                md_table = self.convert_range_to_markdown(sheet, sheet.dimensions, sheet_with_values)
-                if md_table:
-                    tables_md.append(md_table)
-                    tables_info.append({
-                        'name': 'data',
-                        'range': sheet.dimensions,
-                        'type': 'auto_detected',
-                        'markdown': md_table  # Phase 3: AI機能用にMarkdownを保存
-                    })
+                detected_tables = self._detect_tables_by_blank_rows(sheet, sheet_with_values)
+                for idx, table_range in enumerate(detected_tables):
+                    md_table = self.convert_range_to_markdown(sheet, table_range, sheet_with_values)
+                    if md_table:
+                        tables_md.append(md_table)
+                        tables_info.append({
+                            'name': f'table_{idx + 1}',
+                            'range': table_range,
+                            'type': 'auto_detected',
+                            'markdown': md_table  # Phase 3: AI機能用にMarkdownを保存
+                        })
 
         return tables_md, tables_info
+
+    def _detect_tables_by_blank_rows(self, sheet, sheet_with_values=None) -> List[str]:
+        """
+        空白行で区切られた複数の表を検出
+
+        Args:
+            sheet: openpyxlのWorksheetオブジェクト
+            sheet_with_values: 実数値を含むシート
+
+        Returns:
+            検出されたテーブル範囲のリスト（例: ["A1:D5", "A7:D10"]）
+        """
+        if not sheet.dimensions or sheet.dimensions == "A1:A1":
+            return []
+
+        # 使用範囲を取得
+        min_row = sheet.min_row
+        max_row = sheet.max_row
+        min_col = sheet.min_column
+        max_col = sheet.max_column
+
+        # 空白行を検出
+        blank_rows = []
+        for row_idx in range(min_row, max_row + 1):
+            is_blank = True
+            for col_idx in range(min_col, max_col + 1):
+                cell_value = sheet.cell(row_idx, col_idx).value
+                if cell_value is not None and str(cell_value).strip() != "":
+                    is_blank = False
+                    break
+            if is_blank:
+                blank_rows.append(row_idx)
+
+        # 空白行がない場合は、全体を1つのテーブルとして扱う
+        if not blank_rows:
+            return [sheet.dimensions]
+
+        # 空白行で区切られたテーブル範囲を生成
+        table_ranges = []
+        current_start_row = min_row
+
+        for blank_row in blank_rows:
+            # 空白行の前までをテーブルとして扱う
+            if blank_row > current_start_row:
+                # テーブル範囲を作成
+                start_cell = f"{get_column_letter(min_col)}{current_start_row}"
+                end_cell = f"{get_column_letter(max_col)}{blank_row - 1}"
+                table_range = f"{start_cell}:{end_cell}"
+                table_ranges.append(table_range)
+
+            # 次のテーブルの開始行を設定
+            current_start_row = blank_row + 1
+
+        # 最後のテーブルを追加
+        if current_start_row <= max_row:
+            start_cell = f"{get_column_letter(min_col)}{current_start_row}"
+            end_cell = f"{get_column_letter(max_col)}{max_row}"
+            table_range = f"{start_cell}:{end_cell}"
+            table_ranges.append(table_range)
+
+        # 空のテーブルを除外
+        valid_ranges = []
+        for table_range in table_ranges:
+            # テーブル範囲が空でないか確認
+            has_data = False
+            for row in sheet[table_range]:
+                for cell in row:
+                    if cell.value is not None and str(cell.value).strip() != "":
+                        has_data = True
+                        break
+                if has_data:
+                    break
+            if has_data:
+                valid_ranges.append(table_range)
+
+        return valid_ranges if valid_ranges else [sheet.dimensions]
 
     def convert_range_to_markdown(self, sheet, cell_range: str, sheet_with_values=None) -> str:
         """
@@ -93,6 +173,10 @@ class TableParser:
                         # 実数値がNoneの場合は数式を表示
                         if value is None:
                             value = formula
+
+                    # セルのフォーマットを適用して値を整形
+                    if value is not None and value != "":
+                        value = self._format_cell_value(value, cell)
 
                     if value is None:
                         value = ""
@@ -187,3 +271,89 @@ class TableParser:
             return "【テーブル要約】 " + "、".join(summary_parts)
 
         return ""
+
+    def _format_cell_value(self, value, cell):
+        """
+        セルの値をフォーマットして返す
+
+        Args:
+            value: セルの値
+            cell: openpyxlのCellオブジェクト
+
+        Returns:
+            フォーマットされた値
+        """
+        # datetimeオブジェクトの場合はそのまま文字列化
+        if isinstance(value, datetime):
+            # セルのフォーマットを確認
+            if cell.number_format:
+                format_str = cell.number_format
+                # 日付のみのフォーマット
+                if any(x in format_str.lower() for x in ['yy', 'mm', 'dd']) and 'h' not in format_str.lower():
+                    return value.strftime('%Y年%m月%d日')
+                # 時刻を含むフォーマット
+                elif 'h' in format_str.lower() or 'm' in format_str.lower() or 's' in format_str.lower():
+                    return value.strftime('%Y年%m月%d日 %H:%M:%S')
+            # デフォルトのフォーマット
+            return value.strftime('%Y年%m月%d日')
+
+        # 数値の場合、日付フォーマットかどうかを確認
+        if isinstance(value, (int, float)):
+            if cell.number_format:
+                format_str = cell.number_format
+
+                # 日付フォーマットの検出
+                # Excelの日付フォーマットには通常 'yy', 'mm', 'dd' が含まれる
+                is_date_format = any(x in format_str.lower() for x in ['yy', 'mm', 'dd', 'yyyy', 'mmmm'])
+
+                if is_date_format:
+                    try:
+                        # Excelの日付シリアル値を変換（1900年1月1日からの経過日数）
+                        # Excelは1900年1月1日を1とする（ただし1900年はうるう年ではない）
+                        if value > 59:
+                            # 1900年3月1日以降（Excel のバグ考慮後）
+                            excel_date = datetime(1899, 12, 30) + timedelta(days=value)
+                        elif value >= 1:
+                            # 1900年1月1日から2月28日まで
+                            excel_date = datetime(1899, 12, 31) + timedelta(days=value)
+                        else:
+                            # 1未満は時刻のみ
+                            excel_date = datetime(1900, 1, 1) + timedelta(days=value)
+
+                        # 時刻を含むかチェック
+                        has_time = 'h' in format_str.lower() or ('m' in format_str.lower() and ':' in format_str)
+
+                        if has_time:
+                            return excel_date.strftime('%Y年%m月%d日 %H:%M:%S')
+                        else:
+                            return excel_date.strftime('%Y年%m月%d日')
+                    except (ValueError, OverflowError):
+                        # 変換に失敗した場合は元の値を返す
+                        pass
+
+                # パーセンテージフォーマットの検出
+                if '%' in format_str:
+                    try:
+                        return f"{value * 100:.2f}%"
+                    except:
+                        pass
+
+                # 通貨フォーマットの検出
+                if '¥' in format_str or '円' in format_str:
+                    try:
+                        return f"¥{value:,.0f}"
+                    except:
+                        pass
+
+                # カンマ区切りの数値フォーマット
+                if '#,##0' in format_str or '0.00' in format_str:
+                    try:
+                        if '.' in format_str:
+                            decimal_places = format_str.count('0') - format_str.index('.') - 1
+                            return f"{value:,.{decimal_places}f}"
+                        else:
+                            return f"{value:,.0f}"
+                    except:
+                        pass
+
+        return value
