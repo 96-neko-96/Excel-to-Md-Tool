@@ -1,5 +1,5 @@
 """
-Image Parser - 画像・グラフ抽出ロジック
+Image Parser - 画像・グラフ・図形抽出ロジック
 """
 
 import os
@@ -9,11 +9,12 @@ import io
 
 
 class ImageParser:
-    """画像・グラフ抽出クラス"""
+    """画像・グラフ・図形抽出クラス"""
 
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.image_counter = 0
+        self.shape_counter = 0
 
     def extract_images(self, sheet) -> Tuple[List[str], List[Dict[str, Any]]]:
         """
@@ -64,7 +65,8 @@ class ImageParser:
                     'index': self.image_counter,
                     'filename': image_filename,
                     'path': image_path,
-                    'title': title
+                    'title': title,
+                    'type': 'image'
                 })
 
             except Exception as e:
@@ -72,6 +74,85 @@ class ImageParser:
                 continue
 
         return images_md, images_info
+
+    def extract_shapes(self, sheet) -> Tuple[List[str], List[Dict[str, Any]]]:
+        """
+        シートから図形とその中のテキストを抽出
+
+        Args:
+            sheet: openpyxlのWorksheetオブジェクト
+
+        Returns:
+            (Markdown形式の図形情報リスト, 図形情報のリスト)
+        """
+        shapes_md = []
+        shapes_info = []
+
+        # openpyxlの図形オブジェクトにアクセス
+        if not hasattr(sheet, '_shapes') or not sheet._shapes:
+            return shapes_md, shapes_info
+
+        for shape in sheet._shapes:
+            try:
+                self.shape_counter += 1
+
+                # 図形の基本情報
+                shape_data = {
+                    'index': self.shape_counter,
+                    'type': 'shape'
+                }
+
+                # 図形名を取得
+                shape_name = getattr(shape, 'name', None) or f"Shape {self.shape_counter}"
+                shape_data['name'] = shape_name
+
+                # 図形内のテキストを取得
+                shape_text = None
+                if hasattr(shape, 'text') and shape.text:
+                    shape_text = shape.text
+                elif hasattr(shape, 'textframe') and shape.textframe:
+                    # textframeからテキストを抽出
+                    if hasattr(shape.textframe, 'text'):
+                        shape_text = shape.textframe.text
+
+                # Markdown形式で出力
+                md_parts = [f"### 📐 {shape_name}"]
+
+                if shape_text:
+                    shape_data['text'] = shape_text
+                    # テキストを引用として表示
+                    md_parts.append(f"> {shape_text}")
+
+                # 位置情報があれば追加
+                if hasattr(shape, 'anchor'):
+                    anchor_info = self._get_anchor_info(shape.anchor)
+                    if anchor_info:
+                        shape_data['position'] = anchor_info
+                        md_parts.append(f"\n**位置情報**: {anchor_info}")
+
+                md_shape = '\n'.join(md_parts)
+                shapes_md.append(md_shape)
+                shapes_info.append(shape_data)
+
+            except Exception as e:
+                print(f"図形抽出エラー: {str(e)}")
+                continue
+
+        return shapes_md, shapes_info
+
+    def _get_anchor_info(self, anchor) -> str:
+        """図形の位置情報を取得"""
+        try:
+            # アンカーの種類によって情報を取得
+            if hasattr(anchor, '_from'):
+                from_cell = anchor._from
+                if hasattr(from_cell, 'col') and hasattr(from_cell, 'row'):
+                    from openpyxl.utils import get_column_letter
+                    col_letter = get_column_letter(from_cell.col + 1)
+                    return f"セル {col_letter}{from_cell.row + 1} 付近"
+            return ""
+        except Exception:
+            return ""
 
     def _save_image(self, img, output_path: str):
         """画像を保存"""

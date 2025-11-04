@@ -39,8 +39,10 @@ class SheetParser:
             'cell_range': self._get_used_range(sheet),
             'tables': [],
             'images': [],
+            'shapes': [],
             'tables_count': 0,
-            'images_count': 0
+            'images_count': 0,
+            'shapes_count': 0
         }
 
         try:
@@ -56,6 +58,11 @@ class SheetParser:
                 sheet_data['images'] = images_info
                 sheet_data['images_count'] = len(images_info)
 
+            # 図形の抽出（常に実行）
+            shapes_md, shapes_info = self.image_parser.extract_shapes(sheet)
+            sheet_data['shapes'] = shapes_info
+            sheet_data['shapes_count'] = len(shapes_info)
+
             # コンテンツの結合
             content_parts = []
 
@@ -66,6 +73,10 @@ class SheetParser:
             # 画像を追加
             if images_md:
                 content_parts.extend(images_md)
+
+            # 図形を追加
+            if shapes_md:
+                content_parts.extend(shapes_md)
 
             # もしテーブルも画像もない場合は、シート全体をテーブルとして扱う
             if not content_parts:
