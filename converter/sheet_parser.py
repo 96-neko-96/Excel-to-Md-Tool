@@ -16,10 +16,15 @@ class SheetParser:
         self.table_parser = TableParser(config)
         self.image_parser = ImageParser(config)
         self.gemini_analyzer = gemini_analyzer  # Phase 3: AI機能用
+        self.workbook_path = None  # Excelファイルのパスを保存
 
     def set_gemini_analyzer(self, gemini_analyzer):
         """Phase 3: GeminiAnalyzerを設定"""
         self.gemini_analyzer = gemini_analyzer
+
+    def set_workbook_path(self, workbook_path: str):
+        """Excelファイルのパスを設定（図形抽出用）"""
+        self.workbook_path = workbook_path
 
     def parse_sheet(self, sheet, sheet_with_values=None) -> Dict[str, Any]:
         """
@@ -59,7 +64,7 @@ class SheetParser:
                 sheet_data['images_count'] = len(images_info)
 
             # 図形の抽出（常に実行）
-            shapes_md, shapes_info = self.image_parser.extract_shapes(sheet)
+            shapes_md, shapes_info = self.image_parser.extract_shapes(sheet, self.workbook_path)
             sheet_data['shapes'] = shapes_info
             sheet_data['shapes_count'] = len(shapes_info)
 

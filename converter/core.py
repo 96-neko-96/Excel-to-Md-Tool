@@ -88,6 +88,9 @@ class ExcelToMarkdownConverter:
         # 1. Excel読み込み（数式用と実数値用の2つ）
         self.workbook, self.workbook_with_values = self._load_excel(input_path)
 
+        # Excelファイルのパスをsheet_parserに設定（図形抽出用）
+        self.sheet_parser.set_workbook_path(input_path)
+
         # 2. 各シートを変換
         for idx, sheet in enumerate(self.workbook.worksheets):
             # 非表示シートはスキップ（設定による）

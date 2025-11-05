@@ -8,6 +8,7 @@ import openpyxl
 from openpyxl.utils import get_column_letter
 from datetime import datetime, timedelta
 import re
+import os
 
 
 class TableParser:
@@ -297,38 +298,27 @@ class TableParser:
             # デフォルトのフォーマット
             return value.strftime('%Y年%m月%d日')
 
-        # 数値の場合、日付フォーマットかどうかを確認
+        # 数値の場合、フォーマットを確認
         if isinstance(value, (int, float)):
-            if cell.number_format:
+            if cell.number_format and cell.number_format != 'General':
                 format_str = cell.number_format
 
-                # 日付フォーマットの検出
-                # Excelの日付フォーマットには通常 'yy', 'mm', 'dd' が含まれる
-                is_date_format = any(x in format_str.lower() for x in ['yy', 'mm', 'dd', 'yyyy', 'mmmm'])
+                # 日付フォーマットの検出（より厳密に）
+                # ユーザー定義フォーマット: yyyy"年"mm"月"dd"日" のような形式
+                # 標準の日付フォーマット: m/d/yy, yyyy/mm/dd など
+                is_date_format = self._is_date_format(format_str)
 
-                if is_date_format:
+                if is_date_format and 1 <= value <= 2958465:  # Excelの有効な日付範囲
                     try:
-                        # Excelの日付シリアル値を変換（1900年1月1日からの経過日数）
-                        # Excelは1900年1月1日を1とする（ただし1900年はうるう年ではない）
-                        if value > 59:
-                            # 1900年3月1日以降（Excel のバグ考慮後）
-                            excel_date = datetime(1899, 12, 30) + timedelta(days=value)
-                        elif value >= 1:
-                            # 1900年1月1日から2月28日まで
-                            excel_date = datetime(1899, 12, 31) + timedelta(days=value)
-                        else:
-                            # 1未満は時刻のみ
-                            excel_date = datetime(1900, 1, 1) + timedelta(days=value)
+                        # Excelの日付シリアル値を変換
+                        excel_date = self._convert_excel_date_to_datetime(value)
 
-                        # 時刻を含むかチェック
-                        has_time = 'h' in format_str.lower() or ('m' in format_str.lower() and ':' in format_str)
-
-                        if has_time:
-                            return excel_date.strftime('%Y年%m月%d日 %H:%M:%S')
-                        else:
-                            return excel_date.strftime('%Y年%m月%d日')
-                    except (ValueError, OverflowError):
+                        # フォーマット文字列をPythonの日付フォーマットに変換
+                        python_format = self._convert_excel_format_to_python(format_str)
+                        return excel_date.strftime(python_format)
+                    except (ValueError, OverflowError) as e:
                         # 変換に失敗した場合は元の値を返す
+                        print(f"日付変換エラー: {e}, value={value}, format={format_str}")
                         pass
 
                 # パーセンテージフォーマットの検出
@@ -357,3 +347,99 @@ class TableParser:
                         pass
 
         return value
+
+    def _is_date_format(self, format_str: str) -> bool:
+        """
+        フォーマット文字列が日付フォーマットかどうかを判定
+
+        Args:
+            format_str: Excelのフォーマット文字列
+
+        Returns:
+            日付フォーマットの場合True
+        """
+        if not format_str:
+            return False
+
+        format_lower = format_str.lower()
+
+        # 日付関連のキーワードをチェック
+        date_keywords = ['yy', 'yyyy', 'mm', 'dd', 'm/', '/m', 'd/', '/d', 'y/', '/y']
+
+        # ユーザー定義フォーマットで「年」「月」「日」を含む場合
+        if '年' in format_str or '月' in format_str or '日' in format_str:
+            return True
+
+        # 標準的な日付フォーマット文字を含む場合
+        for keyword in date_keywords:
+            if keyword in format_lower:
+                return True
+
+        return False
+
+    def _convert_excel_date_to_datetime(self, excel_date: float) -> datetime:
+        """
+        Excelの日付シリアル値をdatetimeオブジェクトに変換
+
+        Args:
+            excel_date: Excelの日付シリアル値
+
+        Returns:
+            datetimeオブジェクト
+        """
+        # Excelは1900年1月1日を1とする（ただし1900年2月29日のバグがある）
+        if excel_date > 59:
+            # 1900年3月1日以降（Excelのバグ考慮後）
+            return datetime(1899, 12, 30) + timedelta(days=excel_date)
+        elif excel_date >= 1:
+            # 1900年1月1日から2月28日まで
+            return datetime(1899, 12, 31) + timedelta(days=excel_date)
+        else:
+            # 1未満は時刻のみ
+            return datetime(1900, 1, 1) + timedelta(days=excel_date)
+
+    def _convert_excel_format_to_python(self, excel_format: str) -> str:
+        """
+        Excelのフォーマット文字列をPythonのstrftimeフォーマットに変換
+
+        Args:
+            excel_format: Excelのフォーマット文字列
+
+        Returns:
+            Pythonのstrftimeフォーマット文字列
+        """
+        # ユーザー定義フォーマットの場合、ダブルクォートで囲まれたリテラル文字を処理
+        # 例: yyyy"年"mm"月"dd"日" -> %Y年%m月%d日
+
+        # まず、ダブルクォートで囲まれた部分を保護
+        import re
+
+        # ダブルクォートで囲まれた部分を一時的にプレースホルダーに置き換え
+        literals = []
+        def replace_literal(match):
+            literals.append(match.group(1))
+            return f"__LITERAL_{len(literals) - 1}__"
+
+        format_str = re.sub(r'"([^"]*)"', replace_literal, excel_format)
+
+        # Excelフォーマットコードを変換
+        # 注意: 長いパターンから先に置換し、単一文字は置換しない
+        # （すでに置換された %m の m を再度置換しないため）
+        format_str = format_str.replace('yyyy', '%Y')
+        format_str = format_str.replace('yy', '%y')
+
+        # mm/dd/hh/ss を置換（Excelでは通常これらの2文字形式のみ使用される）
+        format_str = format_str.replace('mm', '%m')
+        format_str = format_str.replace('dd', '%d')
+        format_str = format_str.replace('hh', '%H')
+        format_str = format_str.replace('ss', '%S')
+
+        # 単一の m/d は通常 Excelでは使われないが、念のため対応
+        # ただし、すでに %m などに置換された部分は避ける
+        # 簡易的に、単一文字の置換はスキップ（通常は mm, dd のみ使用される）
+
+        # プレースホルダーをリテラル文字に戻す
+        for i, literal in enumerate(literals):
+            format_str = format_str.replace(f"__LITERAL_{i}__", literal)
+
+        return format_str
