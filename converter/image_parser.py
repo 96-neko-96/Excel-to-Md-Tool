@@ -94,19 +94,22 @@ class ImageParser:
         shapes_info = []
 
         # 方法1: openpyxlの_drawingを使用
-        openpyxl_shapes_md, openpyxl_shapes_info = self._extract_shapes_from_openpyxl(sheet)
+        openpyxl_shapes_info = self._extract_shapes_from_openpyxl(sheet)
 
         # 方法2: openpyxlで取得できなかった場合、ZIPベースで抽出
         if not openpyxl_shapes_info and excel_path:
             if self.config.get('verbose_logging', False):
                 print(f"openpyxlで図形が取得できなかったため、ZIP解析を試行します...")
 
-            zip_shapes_md, zip_shapes_info = self._extract_shapes_from_zip(excel_path, sheet.title)
-            shapes_md.extend(zip_shapes_md)
+            zip_shapes_info = self._extract_shapes_from_zip(excel_path, sheet.title)
             shapes_info.extend(zip_shapes_info)
         else:
-            shapes_md.extend(openpyxl_shapes_md)
             shapes_info.extend(openpyxl_shapes_info)
+
+        # 図形情報を表形式のMarkdownに変換
+        if shapes_info:
+            table_md = self._generate_shapes_table(shapes_info)
+            shapes_md.append(table_md)
 
         # 抽出結果をログ出力
         if shapes_info:
@@ -117,7 +120,7 @@ class ImageParser:
 
         return shapes_md, shapes_info
 
-    def _extract_shapes_from_openpyxl(self, sheet) -> Tuple[List[str], List[Dict[str, Any]]]:
+    def _extract_shapes_from_openpyxl(self, sheet) -> List[Dict[str, Any]]:
         """
         openpyxlの_drawingを使用して図形を抽出
 
@@ -125,14 +128,13 @@ class ImageParser:
             sheet: openpyxlのWorksheetオブジェクト
 
         Returns:
-            (Markdown形式の図形情報リスト, 図形情報のリスト)
+            図形情報のリスト
         """
-        shapes_md = []
         shapes_info = []
 
         # openpyxlの図形オブジェクトにアクセス（_drawingを使用）
         if not hasattr(sheet, '_drawing') or not sheet._drawing:
-            return shapes_md, shapes_info
+            return shapes_info
 
         try:
             drawing = sheet._drawing
@@ -197,25 +199,14 @@ class ImageParser:
                             # 図形内のテキストを取得
                             shape_text = self._extract_text_from_shape(shape)
 
-                            # テキストが取得できた場合のみMarkdownに追加
+                            # テキストが取得できた場合のみ追加
                             if shape_text:
                                 shape_data['text'] = shape_text
-
-                                # Markdown形式で出力
-                                group_indicator = " (グループ化)" if is_grouped else ""
-                                md_parts = [f"### 📐 {shape_name}{group_indicator}"]
-                                # テキストを引用として表示（複数行対応）
-                                for line in shape_text.split('\n'):
-                                    if line.strip():
-                                        md_parts.append(f"> {line}")
 
                                 # 位置情報を追加
                                 if anchor_info:
                                     shape_data['position'] = anchor_info
-                                    md_parts.append(f"\n**位置情報**: {anchor_info}")
 
-                                md_shape = '\n'.join(md_parts)
-                                shapes_md.append(md_shape)
                                 shapes_info.append(shape_data)
 
                     except Exception as e:
@@ -231,14 +222,7 @@ class ImageParser:
             if self.config.get('verbose_logging', False):
                 traceback.print_exc()
 
-        # 抽出結果をログ出力
-        if shapes_info:
-            print(f"✓ {len(shapes_info)}個の図形を抽出しました")
-            if self.config.get('verbose_logging', False):
-                for shape in shapes_info:
-                    print(f"  - {shape['name']}: {len(shape.get('text', ''))}文字のテキスト")
-
-        return shapes_md, shapes_info
+        return shapes_info
 
     def _extract_text_from_shape(self, shape) -> str:
         """
@@ -301,7 +285,7 @@ class ImageParser:
         # 段落を改行で結合
         return '\n'.join(text_parts) if text_parts else None
 
-    def _extract_shapes_from_zip(self, excel_path: str, sheet_name: str) -> Tuple[List[str], List[Dict[str, Any]]]:
+    def _extract_shapes_from_zip(self, excel_path: str, sheet_name: str) -> List[Dict[str, Any]]:
         """
         ZIPファイルとしてExcelを開き、XMLから直接図形を抽出
 
@@ -310,13 +294,12 @@ class ImageParser:
             sheet_name: シート名
 
         Returns:
-            (Markdown形式の図形情報リスト, 図形情報のリスト)
+            図形情報のリスト
         """
-        shapes_md = []
         shapes_info = []
 
         if not excel_path or not os.path.exists(excel_path):
-            return shapes_md, shapes_info
+            return shapes_info
 
         try:
             with zipfile.ZipFile(excel_path, 'r') as zip_ref:
@@ -340,14 +323,14 @@ class ImageParser:
                         break
 
                 if sheet_index is None:
-                    return shapes_md, shapes_info
+                    return shapes_info
 
                 # drawing*.xmlファイルを探す
                 drawing_files = [f for f in zip_ref.namelist()
                                 if f.startswith('xl/drawings/drawing') and f.endswith('.xml')]
 
                 if not drawing_files:
-                    return shapes_md, shapes_info
+                    return shapes_info
 
                 # シートに対応するdrawingファイルを見つける
                 # worksheet*.xml.relsを確認
@@ -373,7 +356,7 @@ class ImageParser:
                         drawing_rel_id = drawing_files[0]
 
                 if not drawing_rel_id:
-                    return shapes_md, shapes_info
+                    return shapes_info
 
                 # drawingファイルを解析
                 drawing_content = zip_ref.read(drawing_rel_id).decode('utf-8')
@@ -400,7 +383,7 @@ class ImageParser:
                         for shape in single_shapes:
                             self._process_shape_from_xml(
                                 shape, drawing_ns, anchor_type, anchor_position,
-                                shapes_md, shapes_info
+                                shapes_info
                             )
 
                         # 方法2: グループ化された図形を探す
@@ -411,7 +394,7 @@ class ImageParser:
                             for shape in group_shapes_list:
                                 self._process_shape_from_xml(
                                     shape, drawing_ns, anchor_type, anchor_position,
-                                    shapes_md, shapes_info, is_grouped=True
+                                    shapes_info, is_grouped=True
                                 )
 
         except Exception as e:
@@ -420,10 +403,10 @@ class ImageParser:
                 import traceback
                 traceback.print_exc()
 
-        return shapes_md, shapes_info
+        return shapes_info
 
     def _process_shape_from_xml(self, shape, drawing_ns: dict, anchor_type: str,
-                                anchor_position: str, shapes_md: list, shapes_info: list,
+                                anchor_position: str, shapes_info: list,
                                 is_grouped: bool = False):
         """
         XML要素から図形データを抽出してリストに追加
@@ -433,7 +416,6 @@ class ImageParser:
             drawing_ns: XML名前空間の辞書
             anchor_type: アンカータイプ
             anchor_position: アンカーの位置情報
-            shapes_md: Markdownリスト（出力先）
             shapes_info: 図形情報リスト（出力先）
             is_grouped: グループ化された図形かどうか
         """
@@ -486,19 +468,52 @@ class ImageParser:
             if anchor_position:
                 shape_data['position'] = anchor_position
 
-            # Markdown形式で出力
-            group_indicator = " (グループ化)" if is_grouped else ""
-            md_parts = [f"### 📐 {shape_name}{group_indicator}"]
-            for line in shape_text.split('\n'):
-                if line.strip():
-                    md_parts.append(f"> {line}")
-
-            if anchor_position:
-                md_parts.append(f"\n**位置情報**: {anchor_position}")
-
-            md_shape = '\n'.join(md_parts)
-            shapes_md.append(md_shape)
             shapes_info.append(shape_data)
+
+    def _generate_shapes_table(self, shapes_info: List[Dict[str, Any]]) -> str:
+        """
+        図形情報を表形式のMarkdownに変換
+
+        Args:
+            shapes_info: 図形情報のリスト
+
+        Returns:
+            表形式のMarkdown文字列
+        """
+        if not shapes_info:
+            return ""
+
+        # テーブルヘッダー
+        table_lines = [
+            "## 📐 図形一覧\n",
+            "| No. | 図形名 | テキスト内容 | 位置 | グループ化 |",
+            "|-----|--------|-------------|------|-----------|"
+        ]
+
+        # 各図形の行を追加
+        for shape in shapes_info:
+            no = shape.get('index', '-')
+            name = shape.get('name', '-')
+            text = shape.get('text', '-')
+
+            # テキストを1行にまとめる（改行を<br>に変換）
+            if text and text != '-':
+                text = text.replace('\n', '<br>')
+                # 長すぎる場合は省略
+                if len(text) > 100:
+                    text = text[:100] + '...'
+
+            position = shape.get('position', '-')
+            is_grouped = 'はい' if shape.get('is_grouped', False) else 'いいえ'
+
+            # セル内の | をエスケープ
+            name = name.replace('|', '\\|')
+            text = text.replace('|', '\\|')
+            position = position.replace('|', '\\|')
+
+            table_lines.append(f"| {no} | {name} | {text} | {position} | {is_grouped} |")
+
+        return '\n'.join(table_lines)
 
     def _get_position_from_xml_anchor(self, anchor, ns: dict) -> str:
         """XMLアンカーから位置情報を取得"""
