@@ -77,7 +77,7 @@ class ImageParser:
 
     def extract_shapes(self, sheet) -> Tuple[List[str], List[Dict[str, Any]]]:
         """
-        シートから図形とその中のテキストを抽出
+        シートから図形とその中のテキストを抽出（テキストボックスを含む）
 
         Args:
             sheet: openpyxlのWorksheetオブジェクト
@@ -93,80 +93,150 @@ class ImageParser:
             return shapes_md, shapes_info
 
         try:
-            # _drawing から図形を取得
             drawing = sheet._drawing
-            if not hasattr(drawing, 'twoCellAnchor'):
-                return shapes_md, shapes_info
 
-            # twoCellAnchorから図形を抽出
-            for anchor in drawing.twoCellAnchor:
-                try:
-                    self.shape_counter += 1
+            # すべてのアンカータイプをチェック（テキストボックスはどのアンカータイプでも存在する可能性がある）
+            anchor_lists = []
 
-                    # 図形の基本情報
-                    shape_data = {
-                        'index': self.shape_counter,
-                        'type': 'shape'
-                    }
+            if hasattr(drawing, 'twoCellAnchor') and drawing.twoCellAnchor:
+                anchor_lists.append(('twoCellAnchor', drawing.twoCellAnchor))
 
-                    # 図形オブジェクトを取得（sp: shape）
-                    shape = None
-                    shape_name = f"Shape {self.shape_counter}"
+            if hasattr(drawing, 'oneCellAnchor') and drawing.oneCellAnchor:
+                anchor_lists.append(('oneCellAnchor', drawing.oneCellAnchor))
 
-                    # spタグ（図形）を探す
-                    if hasattr(anchor, 'sp') and anchor.sp:
-                        shape = anchor.sp
+            if hasattr(drawing, 'absoluteAnchor') and drawing.absoluteAnchor:
+                anchor_lists.append(('absoluteAnchor', drawing.absoluteAnchor))
+
+            # すべてのアンカーから図形を抽出
+            for anchor_type, anchors in anchor_lists:
+                for anchor in anchors:
+                    try:
+                        # 図形（sp）を取得
+                        shape = None
+                        if hasattr(anchor, 'sp') and anchor.sp:
+                            shape = anchor.sp
+
+                        if not shape:
+                            continue
+
+                        self.shape_counter += 1
+
+                        # 図形の基本情報
+                        shape_data = {
+                            'index': self.shape_counter,
+                            'type': 'shape',
+                            'anchor_type': anchor_type
+                        }
+
                         # 図形名を取得
+                        shape_name = f"Shape {self.shape_counter}"
                         if hasattr(shape, 'nvSpPr') and shape.nvSpPr:
                             if hasattr(shape.nvSpPr, 'cNvPr') and shape.nvSpPr.cNvPr:
-                                shape_name = getattr(shape.nvSpPr.cNvPr, 'name', shape_name)
+                                name = getattr(shape.nvSpPr.cNvPr, 'name', None)
+                                if name:
+                                    shape_name = name
 
                         shape_data['name'] = shape_name
 
                         # 図形内のテキストを取得
-                        shape_text = None
-                        if hasattr(shape, 'txBody') and shape.txBody:
-                            # テキストボディからテキストを抽出
-                            text_parts = []
-                            if hasattr(shape.txBody, 'p'):  # paragraph
-                                for paragraph in shape.txBody.p:
-                                    if hasattr(paragraph, 'r'):  # run
-                                        for run in paragraph.r:
-                                            if hasattr(run, 't') and run.t:
-                                                text_parts.append(run.t)
-                            if text_parts:
-                                shape_text = ''.join(text_parts)
+                        shape_text = self._extract_text_from_shape(shape)
 
-                        # Markdown形式で出力
-                        md_parts = [f"### 📐 {shape_name}"]
-
+                        # テキストが取得できた場合のみMarkdownに追加
                         if shape_text:
                             shape_data['text'] = shape_text
-                            # テキストを引用として表示
-                            md_parts.append(f"> {shape_text}")
 
-                        # 位置情報を追加
-                        anchor_info = self._get_anchor_info(anchor)
-                        if anchor_info:
-                            shape_data['position'] = anchor_info
-                            md_parts.append(f"\n**位置情報**: {anchor_info}")
+                            # Markdown形式で出力
+                            md_parts = [f"### 📐 {shape_name}"]
+                            # テキストを引用として表示（複数行対応）
+                            for line in shape_text.split('\n'):
+                                if line.strip():
+                                    md_parts.append(f"> {line}")
 
-                        md_shape = '\n'.join(md_parts)
-                        shapes_md.append(md_shape)
-                        shapes_info.append(shape_data)
+                            # 位置情報を追加
+                            anchor_info = self._get_anchor_info(anchor)
+                            if anchor_info:
+                                shape_data['position'] = anchor_info
+                                md_parts.append(f"\n**位置情報**: {anchor_info}")
 
-                except Exception as e:
-                    print(f"図形抽出エラー: {str(e)}")
-                    import traceback
-                    traceback.print_exc()
-                    continue
+                            md_shape = '\n'.join(md_parts)
+                            shapes_md.append(md_shape)
+                            shapes_info.append(shape_data)
+
+                    except Exception as e:
+                        print(f"図形抽出エラー（{anchor_type}）: {str(e)}")
+                        import traceback
+                        if self.config.get('verbose_logging', False):
+                            traceback.print_exc()
+                        continue
 
         except Exception as e:
             print(f"図形抽出全体エラー: {str(e)}")
             import traceback
-            traceback.print_exc()
+            if self.config.get('verbose_logging', False):
+                traceback.print_exc()
 
         return shapes_md, shapes_info
+
+    def _extract_text_from_shape(self, shape) -> str:
+        """
+        図形からテキストを抽出
+
+        Args:
+            shape: 図形オブジェクト
+
+        Returns:
+            抽出されたテキスト
+        """
+        text_parts = []
+
+        try:
+            # txBodyからテキストを取得
+            if hasattr(shape, 'txBody') and shape.txBody:
+                txBody = shape.txBody
+
+                # 段落（paragraph）のリストを取得
+                paragraphs = []
+                if hasattr(txBody, 'p'):
+                    if isinstance(txBody.p, list):
+                        paragraphs = txBody.p
+                    else:
+                        paragraphs = [txBody.p]
+
+                # 各段落からテキストを抽出
+                for paragraph in paragraphs:
+                    if paragraph is None:
+                        continue
+
+                    paragraph_text = []
+
+                    # run（テキストの塊）のリストを取得
+                    runs = []
+                    if hasattr(paragraph, 'r'):
+                        if isinstance(paragraph.r, list):
+                            runs = paragraph.r
+                        else:
+                            runs = [paragraph.r]
+
+                    # 各runからテキストを抽出
+                    for run in runs:
+                        if run is None:
+                            continue
+
+                        if hasattr(run, 't') and run.t:
+                            paragraph_text.append(str(run.t))
+
+                    # 段落のテキストを結合
+                    if paragraph_text:
+                        text_parts.append(''.join(paragraph_text))
+
+        except Exception as e:
+            print(f"テキスト抽出エラー: {str(e)}")
+            if self.config.get('verbose_logging', False):
+                import traceback
+                traceback.print_exc()
+
+        # 段落を改行で結合
+        return '\n'.join(text_parts) if text_parts else None
 
     def _get_anchor_info(self, anchor) -> str:
         """図形の位置情報を取得"""
