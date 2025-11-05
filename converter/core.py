@@ -116,6 +116,7 @@ class ExcelToMarkdownConverter:
             'sheets_count': len(self.sheets_data),
             'tables_count': sum(s['tables_count'] for s in self.sheets_data),
             'images_count': sum(s['images_count'] for s in self.sheets_data),
+            'shapes_count': sum(s['shapes_count'] for s in self.sheets_data),
             'estimated_chunks': self._estimate_chunks(md_content),
             'metadata': metadata,
             'output_file': output_path

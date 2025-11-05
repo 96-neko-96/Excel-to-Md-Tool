@@ -175,6 +175,13 @@ class ImageParser:
             if self.config.get('verbose_logging', False):
                 traceback.print_exc()
 
+        # 抽出結果をログ出力
+        if shapes_info:
+            print(f"✓ {len(shapes_info)}個の図形を抽出しました")
+            if self.config.get('verbose_logging', False):
+                for shape in shapes_info:
+                    print(f"  - {shape['name']}: {len(shape.get('text', ''))}文字のテキスト")
+
         return shapes_md, shapes_info
 
     def _extract_text_from_shape(self, shape) -> str:

@@ -731,6 +731,7 @@ with tab1:
                         'sheets_count': result['sheets_count'],
                         'tables_count': result['tables_count'],
                         'images_count': result['images_count'],
+                        'shapes_count': result.get('shapes_count', 0),
                         'estimated_chunks': result['estimated_chunks'],
                         'preset_used': selected_preset
                     })
@@ -757,7 +758,7 @@ with tab1:
 
         # 統計情報
         st.subheader("📊 変換結果サマリー")
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
             st.metric("シート数", result['stats']['sheets_count'])
         with col2:
@@ -765,6 +766,8 @@ with tab1:
         with col3:
             st.metric("画像数", result['stats'].get('images_count', 0))
         with col4:
+            st.metric("図形数", result['stats'].get('shapes_count', 0))
+        with col5:
             st.metric("推奨チャンク数", result['stats']['estimated_chunks'])
 
         # プレビュー
@@ -1206,6 +1209,7 @@ with tab4:
                     st.write("**シート数:**", record.get('sheets_count', 0))
                     st.write("**テーブル数:**", record.get('tables_count', 0))
                     st.write("**画像数:**", record.get('images_count', 0))
+                    st.write("**図形数:**", record.get('shapes_count', 0))
                     st.write("**推奨チャンク数:**", record.get('estimated_chunks', 0))
 
         # 履歴クリア
