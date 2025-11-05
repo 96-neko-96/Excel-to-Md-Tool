@@ -153,56 +153,70 @@ class ImageParser:
             for anchor_type, anchors in anchor_lists:
                 for anchor in anchors:
                     try:
-                        # 図形（sp）を取得
-                        shape = None
+                        anchor_info = self._get_anchor_info(anchor)
+                        shapes_to_process = []
+
+                        # 方法1: 単一の図形（sp）を取得
                         if hasattr(anchor, 'sp') and anchor.sp:
-                            shape = anchor.sp
+                            shapes_to_process.append((anchor.sp, False))
 
-                        if not shape:
-                            continue
+                        # 方法2: グループ化された図形（grpSp）を取得
+                        if hasattr(anchor, 'grpSp') and anchor.grpSp:
+                            # グループ内のすべての図形を取得
+                            if hasattr(anchor.grpSp, 'sp'):
+                                group_shapes = anchor.grpSp.sp if isinstance(anchor.grpSp.sp, list) else [anchor.grpSp.sp]
+                                for grp_shape in group_shapes:
+                                    if grp_shape:
+                                        shapes_to_process.append((grp_shape, True))
 
-                        self.shape_counter += 1
+                        # すべての図形を処理
+                        for shape, is_grouped in shapes_to_process:
+                            if not shape:
+                                continue
 
-                        # 図形の基本情報
-                        shape_data = {
-                            'index': self.shape_counter,
-                            'type': 'shape',
-                            'anchor_type': anchor_type
-                        }
+                            self.shape_counter += 1
 
-                        # 図形名を取得
-                        shape_name = f"Shape {self.shape_counter}"
-                        if hasattr(shape, 'nvSpPr') and shape.nvSpPr:
-                            if hasattr(shape.nvSpPr, 'cNvPr') and shape.nvSpPr.cNvPr:
-                                name = getattr(shape.nvSpPr.cNvPr, 'name', None)
-                                if name:
-                                    shape_name = name
+                            # 図形の基本情報
+                            shape_data = {
+                                'index': self.shape_counter,
+                                'type': 'shape',
+                                'anchor_type': anchor_type,
+                                'is_grouped': is_grouped
+                            }
 
-                        shape_data['name'] = shape_name
+                            # 図形名を取得
+                            shape_name = f"Shape {self.shape_counter}"
+                            if hasattr(shape, 'nvSpPr') and shape.nvSpPr:
+                                if hasattr(shape.nvSpPr, 'cNvPr') and shape.nvSpPr.cNvPr:
+                                    name = getattr(shape.nvSpPr.cNvPr, 'name', None)
+                                    if name:
+                                        shape_name = name
 
-                        # 図形内のテキストを取得
-                        shape_text = self._extract_text_from_shape(shape)
+                            shape_data['name'] = shape_name
 
-                        # テキストが取得できた場合のみMarkdownに追加
-                        if shape_text:
-                            shape_data['text'] = shape_text
+                            # 図形内のテキストを取得
+                            shape_text = self._extract_text_from_shape(shape)
 
-                            # Markdown形式で出力
-                            md_parts = [f"### 📐 {shape_name}"]
-                            # テキストを引用として表示（複数行対応）
-                            for line in shape_text.split('\n'):
-                                if line.strip():
-                                    md_parts.append(f"> {line}")
+                            # テキストが取得できた場合のみMarkdownに追加
+                            if shape_text:
+                                shape_data['text'] = shape_text
 
-                            # 位置情報を追加
-                            anchor_info = self._get_anchor_info(anchor)
-                            if anchor_info:
-                                shape_data['position'] = anchor_info
-                                md_parts.append(f"\n**位置情報**: {anchor_info}")
+                                # Markdown形式で出力
+                                group_indicator = " (グループ化)" if is_grouped else ""
+                                md_parts = [f"### 📐 {shape_name}{group_indicator}"]
+                                # テキストを引用として表示（複数行対応）
+                                for line in shape_text.split('\n'):
+                                    if line.strip():
+                                        md_parts.append(f"> {line}")
 
-                            md_shape = '\n'.join(md_parts)
-                            shapes_md.append(md_shape)
-                            shapes_info.append(shape_data)
+                                # 位置情報を追加
+                                if anchor_info:
+                                    shape_data['position'] = anchor_info
+                                    md_parts.append(f"\n**位置情報**: {anchor_info}")
+
+                                md_shape = '\n'.join(md_parts)
+                                shapes_md.append(md_shape)
+                                shapes_info.append(shape_data)
 
                     except Exception as e:
                         print(f"図形抽出エラー（{anchor_type}）: {str(e)}")
@@ -378,73 +392,27 @@ class ImageParser:
                     anchors = drawing_root.findall(f'.//xdr:{anchor_type}', drawing_ns)
 
                     for anchor in anchors:
-                        # 図形要素を探す
-                        shape = anchor.find('.//xdr:sp', drawing_ns)
+                        # アンカーの位置情報を取得（グループ内の図形にも使用）
+                        anchor_position = self._get_position_from_xml_anchor(anchor, drawing_ns)
 
-                        if shape is None:
-                            continue
+                        # 方法1: 単一の図形要素を探す
+                        single_shapes = anchor.findall('./xdr:sp', drawing_ns)
+                        for shape in single_shapes:
+                            self._process_shape_from_xml(
+                                shape, drawing_ns, anchor_type, anchor_position,
+                                shapes_md, shapes_info
+                            )
 
-                        self.shape_counter += 1
-
-                        # 図形名を取得
-                        shape_name = f"Shape {self.shape_counter}"
-                        nv_sp_pr = shape.find('.//xdr:nvSpPr', drawing_ns)
-                        if nv_sp_pr is not None:
-                            c_nv_pr = nv_sp_pr.find('.//xdr:cNvPr', drawing_ns)
-                            if c_nv_pr is not None:
-                                name_attr = c_nv_pr.get('name')
-                                if name_attr:
-                                    shape_name = name_attr
-
-                        # テキストを取得
-                        text_parts = []
-                        tx_body = shape.find('.//xdr:txBody', drawing_ns)
-
-                        if tx_body is not None:
-                            paragraphs = tx_body.findall('.//a:p', drawing_ns)
-
-                            for paragraph in paragraphs:
-                                para_text = []
-
-                                # テキストラン（a:r）を取得
-                                runs = paragraph.findall('.//a:r', drawing_ns)
-                                for run in runs:
-                                    t_elem = run.find('.//a:t', drawing_ns)
-                                    if t_elem is not None and t_elem.text:
-                                        para_text.append(t_elem.text)
-
-                                if para_text:
-                                    text_parts.append(''.join(para_text))
-
-                        shape_text = '\n'.join(text_parts) if text_parts else None
-
-                        # テキストがある場合のみ追加
-                        if shape_text:
-                            shape_data = {
-                                'index': self.shape_counter,
-                                'name': shape_name,
-                                'type': 'shape',
-                                'anchor_type': anchor_type,
-                                'text': shape_text
-                            }
-
-                            # 位置情報を取得
-                            position = self._get_position_from_xml_anchor(anchor, drawing_ns)
-                            if position:
-                                shape_data['position'] = position
-
-                            # Markdown形式で出力
-                            md_parts = [f"### 📐 {shape_name}"]
-                            for line in shape_text.split('\n'):
-                                if line.strip():
-                                    md_parts.append(f"> {line}")
-
-                            if position:
-                                md_parts.append(f"\n**位置情報**: {position}")
-
-                            md_shape = '\n'.join(md_parts)
-                            shapes_md.append(md_shape)
-                            shapes_info.append(shape_data)
+                        # 方法2: グループ化された図形を探す
+                        group_shapes = anchor.findall('./xdr:grpSp', drawing_ns)
+                        for group in group_shapes:
+                            # グループ内のすべての図形を取得
+                            group_shapes_list = group.findall('.//xdr:sp', drawing_ns)
+                            for shape in group_shapes_list:
+                                self._process_shape_from_xml(
+                                    shape, drawing_ns, anchor_type, anchor_position,
+                                    shapes_md, shapes_info, is_grouped=True
+                                )
 
         except Exception as e:
             print(f"ZIP解析による図形抽出エラー: {str(e)}")
@@ -453,6 +421,84 @@ class ImageParser:
                 traceback.print_exc()
 
         return shapes_md, shapes_info
+
+    def _process_shape_from_xml(self, shape, drawing_ns: dict, anchor_type: str,
+                                anchor_position: str, shapes_md: list, shapes_info: list,
+                                is_grouped: bool = False):
+        """
+        XML要素から図形データを抽出してリストに追加
+
+        Args:
+            shape: 図形のXML要素
+            drawing_ns: XML名前空間の辞書
+            anchor_type: アンカータイプ
+            anchor_position: アンカーの位置情報
+            shapes_md: Markdownリスト（出力先）
+            shapes_info: 図形情報リスト（出力先）
+            is_grouped: グループ化された図形かどうか
+        """
+        self.shape_counter += 1
+
+        # 図形名を取得
+        shape_name = f"Shape {self.shape_counter}"
+        nv_sp_pr = shape.find('.//xdr:nvSpPr', drawing_ns)
+        if nv_sp_pr is not None:
+            c_nv_pr = nv_sp_pr.find('.//xdr:cNvPr', drawing_ns)
+            if c_nv_pr is not None:
+                name_attr = c_nv_pr.get('name')
+                if name_attr:
+                    shape_name = name_attr
+
+        # テキストを取得
+        text_parts = []
+        tx_body = shape.find('.//xdr:txBody', drawing_ns)
+
+        if tx_body is not None:
+            paragraphs = tx_body.findall('.//a:p', drawing_ns)
+
+            for paragraph in paragraphs:
+                para_text = []
+
+                # テキストラン（a:r）を取得
+                runs = paragraph.findall('.//a:r', drawing_ns)
+                for run in runs:
+                    t_elem = run.find('.//a:t', drawing_ns)
+                    if t_elem is not None and t_elem.text:
+                        para_text.append(t_elem.text)
+
+                if para_text:
+                    text_parts.append(''.join(para_text))
+
+        shape_text = '\n'.join(text_parts) if text_parts else None
+
+        # テキストがある場合のみ追加
+        if shape_text:
+            shape_data = {
+                'index': self.shape_counter,
+                'name': shape_name,
+                'type': 'shape',
+                'anchor_type': anchor_type,
+                'text': shape_text,
+                'is_grouped': is_grouped
+            }
+
+            # 位置情報を追加
+            if anchor_position:
+                shape_data['position'] = anchor_position
+
+            # Markdown形式で出力
+            group_indicator = " (グループ化)" if is_grouped else ""
+            md_parts = [f"### 📐 {shape_name}{group_indicator}"]
+            for line in shape_text.split('\n'):
+                if line.strip():
+                    md_parts.append(f"> {line}")
+
+            if anchor_position:
+                md_parts.append(f"\n**位置情報**: {anchor_position}")
+
+            md_shape = '\n'.join(md_parts)
+            shapes_md.append(md_shape)
+            shapes_info.append(shape_data)
 
     def _get_position_from_xml_anchor(self, anchor, ns: dict) -> str:
         """XMLアンカーから位置情報を取得"""
