@@ -184,7 +184,9 @@ class TableParser:
 
                     if value is None:
                         value = ""
-                    row_data.append(str(value))
+                    # セル内の改行を<br>タグに置換してMarkdownテーブルの構造を保持
+                    cell_text = str(value).replace('\n', '<br>').replace('\r', '')
+                    row_data.append(cell_text)
                 data.append(row_data)
 
             if not data:
