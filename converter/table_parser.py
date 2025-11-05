@@ -156,6 +156,9 @@ class TableParser:
                 row_data = []
                 for col_idx, cell in enumerate(row):
                     # 実数値の取得を優先
+                    value = None
+                    format_cell = cell  # フォーマット情報を持つセル
+
                     if sheet_with_values:
                         # 実数値シートから値を取得
                         value_cell = sheet_with_values.cell(cell.row, cell.column)
@@ -175,8 +178,9 @@ class TableParser:
                             value = formula
 
                     # セルのフォーマットを適用して値を整形
+                    # フォーマット情報は元のセル（数式セル）から取得
                     if value is not None and value != "":
-                        value = self._format_cell_value(value, cell)
+                        value = self._format_cell_value(value, format_cell)
 
                     if value is None:
                         value = ""
@@ -303,10 +307,25 @@ class TableParser:
                 format_str = cell.number_format
 
                 # 日付フォーマットの検出
-                # Excelの日付フォーマットには通常 'yy', 'mm', 'dd' が含まれる
-                is_date_format = any(x in format_str.lower() for x in ['yy', 'mm', 'dd', 'yyyy', 'mmmm'])
+                # 1. Excelのビルトイン日付フォーマット番号をチェック
+                # フォーマット番号14-22は日付/時刻フォーマット
+                is_builtin_date = False
+                if hasattr(cell, 'style') and hasattr(cell.style, 'number_format'):
+                    # ビルトイン日付フォーマットのチェック
+                    # openpyxlでは is_date_format でチェック可能
+                    if hasattr(cell, 'is_date') and cell.is_date:
+                        is_builtin_date = True
 
-                if is_date_format:
+                # 2. フォーマット文字列に日付関連のキーワードが含まれるかチェック
+                # 日本語のフォーマット（年月日）も検出
+                is_date_format = any(x in format_str.lower() for x in ['yy', 'mm', 'dd', 'yyyy', 'mmmm']) or \
+                                any(x in format_str for x in ['年', '月', '日'])
+
+                # 3. 数値が日付の範囲内かどうかをチェック（1900年から2100年の範囲）
+                # Excelの日付シリアル値は通常1（1900/1/1）から73050（2100/1/1）程度
+                is_potential_date = 1 <= value <= 73050
+
+                if (is_date_format or is_builtin_date) and is_potential_date:
                     try:
                         # Excelの日付シリアル値を変換（1900年1月1日からの経過日数）
                         # Excelは1900年1月1日を1とする（ただし1900年はうるう年ではない）
@@ -321,7 +340,8 @@ class TableParser:
                             excel_date = datetime(1900, 1, 1) + timedelta(days=value)
 
                         # 時刻を含むかチェック
-                        has_time = 'h' in format_str.lower() or ('m' in format_str.lower() and ':' in format_str)
+                        has_time = 'h' in format_str.lower() or ('m' in format_str.lower() and ':' in format_str) or \
+                                  '時' in format_str or '分' in format_str or '秒' in format_str
 
                         if has_time:
                             return excel_date.strftime('%Y年%m月%d日 %H:%M:%S')
