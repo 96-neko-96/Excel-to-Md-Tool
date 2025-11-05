@@ -43,6 +43,7 @@ class MetadataGenerator:
             'statistics': {
                 'total_tables': 0,
                 'total_images': 0,
+                'total_shapes': 0,
                 'total_size_kb': 0
             },
             'rag_optimization': {
@@ -59,6 +60,7 @@ class MetadataGenerator:
                 'cell_range': sheet_data['cell_range'],
                 'tables_count': sheet_data['tables_count'],
                 'images_count': sheet_data['images_count'],
+                'shapes_count': sheet_data.get('shapes_count', 0),
                 'section_in_md': f"#{self._create_anchor(sheet_data['name'])}",
                 'keywords': self._extract_keywords(sheet_data['content'])
             }
@@ -66,6 +68,7 @@ class MetadataGenerator:
 
             metadata['statistics']['total_tables'] += sheet_meta['tables_count']
             metadata['statistics']['total_images'] += sheet_meta['images_count']
+            metadata['statistics']['total_shapes'] += sheet_meta['shapes_count']
 
         # シート間参照
         for ref in cross_references:

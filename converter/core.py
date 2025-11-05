@@ -97,7 +97,7 @@ class ExcelToMarkdownConverter:
             # 対応する実数値シートを取得
             sheet_with_values = self.workbook_with_values.worksheets[idx] if self.workbook_with_values else None
 
-            sheet_data = self._convert_sheet(sheet, sheet_with_values)
+            sheet_data = self._convert_sheet(sheet, sheet_with_values, input_path)
             self.sheets_data.append(sheet_data)
 
         # 3. シート間参照解析
@@ -116,6 +116,7 @@ class ExcelToMarkdownConverter:
             'sheets_count': len(self.sheets_data),
             'tables_count': sum(s['tables_count'] for s in self.sheets_data),
             'images_count': sum(s['images_count'] for s in self.sheets_data),
+            'shapes_count': sum(s['shapes_count'] for s in self.sheets_data),
             'estimated_chunks': self._estimate_chunks(md_content),
             'metadata': metadata,
             'output_file': output_path
@@ -138,9 +139,9 @@ class ExcelToMarkdownConverter:
         except Exception as e:
             raise ValueError(f"Excelファイルの読み込みに失敗しました: {str(e)}")
 
-    def _convert_sheet(self, sheet, sheet_with_values=None) -> Dict[str, Any]:
+    def _convert_sheet(self, sheet, sheet_with_values=None, excel_path: str = None) -> Dict[str, Any]:
         """シートを変換"""
-        return self.sheet_parser.parse_sheet(sheet, sheet_with_values)
+        return self.sheet_parser.parse_sheet(sheet, sheet_with_values, excel_path)
 
     def _analyze_references(self) -> List[Dict[str, Any]]:
         """シート間参照を解析"""
