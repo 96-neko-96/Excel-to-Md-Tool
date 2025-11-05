@@ -95,12 +95,14 @@ class MarkdownGenerator:
         for idx, sheet_data in enumerate(sheets_data, 1):
             sheet_anchor = self._create_anchor(sheet_data['name'])
 
-            # シート名とテーブル・画像数の情報
+            # シート名とテーブル・画像・図形数の情報
             info_parts = []
             if sheet_data['tables_count'] > 0:
                 info_parts.append(f"{sheet_data['tables_count']}表")
             if sheet_data['images_count'] > 0:
                 info_parts.append(f"{sheet_data['images_count']}画像")
+            if sheet_data.get('shapes_count', 0) > 0:
+                info_parts.append(f"{sheet_data['shapes_count']}図形")
 
             info_str = f" ({', '.join(info_parts)})" if info_parts else ""
 
