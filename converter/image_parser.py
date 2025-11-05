@@ -77,7 +77,7 @@ class ImageParser:
 
     def extract_shapes(self, sheet) -> Tuple[List[str], List[Dict[str, Any]]]:
         """
-        シートから図形とその中のテキストを抽出
+        シートから図形とその中のテキストを抽出（テキストボックスを含む）
 
         Args:
             sheet: openpyxlのWorksheetオブジェクト
@@ -88,68 +88,171 @@ class ImageParser:
         shapes_md = []
         shapes_info = []
 
-        # openpyxlの図形オブジェクトにアクセス
-        if not hasattr(sheet, '_shapes') or not sheet._shapes:
+        # openpyxlの図形オブジェクトにアクセス（_drawingを使用）
+        if not hasattr(sheet, '_drawing') or not sheet._drawing:
             return shapes_md, shapes_info
 
-        for shape in sheet._shapes:
-            try:
-                self.shape_counter += 1
+        try:
+            drawing = sheet._drawing
 
-                # 図形の基本情報
-                shape_data = {
-                    'index': self.shape_counter,
-                    'type': 'shape'
-                }
+            # すべてのアンカータイプをチェック（テキストボックスはどのアンカータイプでも存在する可能性がある）
+            anchor_lists = []
 
-                # 図形名を取得
-                shape_name = getattr(shape, 'name', None) or f"Shape {self.shape_counter}"
-                shape_data['name'] = shape_name
+            if hasattr(drawing, 'twoCellAnchor') and drawing.twoCellAnchor:
+                anchor_lists.append(('twoCellAnchor', drawing.twoCellAnchor))
 
-                # 図形内のテキストを取得
-                shape_text = None
-                if hasattr(shape, 'text') and shape.text:
-                    shape_text = shape.text
-                elif hasattr(shape, 'textframe') and shape.textframe:
-                    # textframeからテキストを抽出
-                    if hasattr(shape.textframe, 'text'):
-                        shape_text = shape.textframe.text
+            if hasattr(drawing, 'oneCellAnchor') and drawing.oneCellAnchor:
+                anchor_lists.append(('oneCellAnchor', drawing.oneCellAnchor))
 
-                # Markdown形式で出力
-                md_parts = [f"### 📐 {shape_name}"]
+            if hasattr(drawing, 'absoluteAnchor') and drawing.absoluteAnchor:
+                anchor_lists.append(('absoluteAnchor', drawing.absoluteAnchor))
 
-                if shape_text:
-                    shape_data['text'] = shape_text
-                    # テキストを引用として表示
-                    md_parts.append(f"> {shape_text}")
+            # すべてのアンカーから図形を抽出
+            for anchor_type, anchors in anchor_lists:
+                for anchor in anchors:
+                    try:
+                        # 図形（sp）を取得
+                        shape = None
+                        if hasattr(anchor, 'sp') and anchor.sp:
+                            shape = anchor.sp
 
-                # 位置情報があれば追加
-                if hasattr(shape, 'anchor'):
-                    anchor_info = self._get_anchor_info(shape.anchor)
-                    if anchor_info:
-                        shape_data['position'] = anchor_info
-                        md_parts.append(f"\n**位置情報**: {anchor_info}")
+                        if not shape:
+                            continue
 
-                md_shape = '\n'.join(md_parts)
-                shapes_md.append(md_shape)
-                shapes_info.append(shape_data)
+                        self.shape_counter += 1
 
-            except Exception as e:
-                print(f"図形抽出エラー: {str(e)}")
-                continue
+                        # 図形の基本情報
+                        shape_data = {
+                            'index': self.shape_counter,
+                            'type': 'shape',
+                            'anchor_type': anchor_type
+                        }
+
+                        # 図形名を取得
+                        shape_name = f"Shape {self.shape_counter}"
+                        if hasattr(shape, 'nvSpPr') and shape.nvSpPr:
+                            if hasattr(shape.nvSpPr, 'cNvPr') and shape.nvSpPr.cNvPr:
+                                name = getattr(shape.nvSpPr.cNvPr, 'name', None)
+                                if name:
+                                    shape_name = name
+
+                        shape_data['name'] = shape_name
+
+                        # 図形内のテキストを取得
+                        shape_text = self._extract_text_from_shape(shape)
+
+                        # テキストが取得できた場合のみMarkdownに追加
+                        if shape_text:
+                            shape_data['text'] = shape_text
+
+                            # Markdown形式で出力
+                            md_parts = [f"### 📐 {shape_name}"]
+                            # テキストを引用として表示（複数行対応）
+                            for line in shape_text.split('\n'):
+                                if line.strip():
+                                    md_parts.append(f"> {line}")
+
+                            # 位置情報を追加
+                            anchor_info = self._get_anchor_info(anchor)
+                            if anchor_info:
+                                shape_data['position'] = anchor_info
+                                md_parts.append(f"\n**位置情報**: {anchor_info}")
+
+                            md_shape = '\n'.join(md_parts)
+                            shapes_md.append(md_shape)
+                            shapes_info.append(shape_data)
+
+                    except Exception as e:
+                        print(f"図形抽出エラー（{anchor_type}）: {str(e)}")
+                        import traceback
+                        if self.config.get('verbose_logging', False):
+                            traceback.print_exc()
+                        continue
+
+        except Exception as e:
+            print(f"図形抽出全体エラー: {str(e)}")
+            import traceback
+            if self.config.get('verbose_logging', False):
+                traceback.print_exc()
 
         return shapes_md, shapes_info
+
+    def _extract_text_from_shape(self, shape) -> str:
+        """
+        図形からテキストを抽出
+
+        Args:
+            shape: 図形オブジェクト
+
+        Returns:
+            抽出されたテキスト
+        """
+        text_parts = []
+
+        try:
+            # txBodyからテキストを取得
+            if hasattr(shape, 'txBody') and shape.txBody:
+                txBody = shape.txBody
+
+                # 段落（paragraph）のリストを取得
+                paragraphs = []
+                if hasattr(txBody, 'p'):
+                    if isinstance(txBody.p, list):
+                        paragraphs = txBody.p
+                    else:
+                        paragraphs = [txBody.p]
+
+                # 各段落からテキストを抽出
+                for paragraph in paragraphs:
+                    if paragraph is None:
+                        continue
+
+                    paragraph_text = []
+
+                    # run（テキストの塊）のリストを取得
+                    runs = []
+                    if hasattr(paragraph, 'r'):
+                        if isinstance(paragraph.r, list):
+                            runs = paragraph.r
+                        else:
+                            runs = [paragraph.r]
+
+                    # 各runからテキストを抽出
+                    for run in runs:
+                        if run is None:
+                            continue
+
+                        if hasattr(run, 't') and run.t:
+                            paragraph_text.append(str(run.t))
+
+                    # 段落のテキストを結合
+                    if paragraph_text:
+                        text_parts.append(''.join(paragraph_text))
+
+        except Exception as e:
+            print(f"テキスト抽出エラー: {str(e)}")
+            if self.config.get('verbose_logging', False):
+                import traceback
+                traceback.print_exc()
+
+        # 段落を改行で結合
+        return '\n'.join(text_parts) if text_parts else None
 
     def _get_anchor_info(self, anchor) -> str:
         """図形の位置情報を取得"""
         try:
-            # アンカーの種類によって情報を取得
+            # twoCellAnchorの場合
             if hasattr(anchor, '_from'):
                 from_cell = anchor._from
                 if hasattr(from_cell, 'col') and hasattr(from_cell, 'row'):
                     from openpyxl.utils import get_column_letter
                     col_letter = get_column_letter(from_cell.col + 1)
                     return f"セル {col_letter}{from_cell.row + 1} 付近"
+            # 別の方法でアンカー情報を取得
+            elif hasattr(anchor, 'col') and hasattr(anchor, 'row'):
+                from openpyxl.utils import get_column_letter
+                col_letter = get_column_letter(anchor.col + 1)
+                return f"セル {col_letter}{anchor.row + 1} 付近"
             return ""
         except Exception:
             return ""
