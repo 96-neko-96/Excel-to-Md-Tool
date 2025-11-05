@@ -6,6 +6,9 @@ import os
 from typing import List, Tuple, Dict, Any
 from PIL import Image
 import io
+import zipfile
+from xml.etree import ElementTree as ET
+import re
 
 
 class ImageParser:
@@ -15,6 +18,7 @@ class ImageParser:
         self.config = config
         self.image_counter = 0
         self.shape_counter = 0
+        self.excel_file_path = None  # Excelファイルのパスを保持
 
     def extract_images(self, sheet) -> Tuple[List[str], List[Dict[str, Any]]]:
         """
@@ -75,9 +79,47 @@ class ImageParser:
 
         return images_md, images_info
 
-    def extract_shapes(self, sheet) -> Tuple[List[str], List[Dict[str, Any]]]:
+    def extract_shapes(self, sheet, excel_path: str = None) -> Tuple[List[str], List[Dict[str, Any]]]:
         """
         シートから図形とその中のテキストを抽出（テキストボックスを含む）
+
+        Args:
+            sheet: openpyxlのWorksheetオブジェクト
+            excel_path: Excelファイルのパス（ZIPベースの抽出に使用）
+
+        Returns:
+            (Markdown形式の図形情報リスト, 図形情報のリスト)
+        """
+        shapes_md = []
+        shapes_info = []
+
+        # 方法1: openpyxlの_drawingを使用
+        openpyxl_shapes_md, openpyxl_shapes_info = self._extract_shapes_from_openpyxl(sheet)
+
+        # 方法2: openpyxlで取得できなかった場合、ZIPベースで抽出
+        if not openpyxl_shapes_info and excel_path:
+            if self.config.get('verbose_logging', False):
+                print(f"openpyxlで図形が取得できなかったため、ZIP解析を試行します...")
+
+            zip_shapes_md, zip_shapes_info = self._extract_shapes_from_zip(excel_path, sheet.title)
+            shapes_md.extend(zip_shapes_md)
+            shapes_info.extend(zip_shapes_info)
+        else:
+            shapes_md.extend(openpyxl_shapes_md)
+            shapes_info.extend(openpyxl_shapes_info)
+
+        # 抽出結果をログ出力
+        if shapes_info:
+            print(f"✓ {len(shapes_info)}個の図形を抽出しました")
+            if self.config.get('verbose_logging', False):
+                for shape in shapes_info:
+                    print(f"  - {shape['name']}: {len(shape.get('text', ''))}文字のテキスト")
+
+        return shapes_md, shapes_info
+
+    def _extract_shapes_from_openpyxl(self, sheet) -> Tuple[List[str], List[Dict[str, Any]]]:
+        """
+        openpyxlの_drawingを使用して図形を抽出
 
         Args:
             sheet: openpyxlのWorksheetオブジェクト
@@ -244,6 +286,194 @@ class ImageParser:
 
         # 段落を改行で結合
         return '\n'.join(text_parts) if text_parts else None
+
+    def _extract_shapes_from_zip(self, excel_path: str, sheet_name: str) -> Tuple[List[str], List[Dict[str, Any]]]:
+        """
+        ZIPファイルとしてExcelを開き、XMLから直接図形を抽出
+
+        Args:
+            excel_path: Excelファイルのパス
+            sheet_name: シート名
+
+        Returns:
+            (Markdown形式の図形情報リスト, 図形情報のリスト)
+        """
+        shapes_md = []
+        shapes_info = []
+
+        if not excel_path or not os.path.exists(excel_path):
+            return shapes_md, shapes_info
+
+        try:
+            with zipfile.ZipFile(excel_path, 'r') as zip_ref:
+                # シートインデックスを取得するため、workbook.xmlを読む
+                workbook_xml = zip_ref.read('xl/workbook.xml').decode('utf-8')
+                wb_root = ET.fromstring(workbook_xml)
+
+                # 名前空間の定義
+                ns = {
+                    'main': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main',
+                    'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+                }
+
+                # シート名からシートインデックスを取得
+                sheet_index = None
+                sheets = wb_root.findall('.//main:sheet', ns)
+                for idx, sheet_elem in enumerate(sheets, 1):
+                    name = sheet_elem.get('name')
+                    if name == sheet_name:
+                        sheet_index = idx
+                        break
+
+                if sheet_index is None:
+                    return shapes_md, shapes_info
+
+                # drawing*.xmlファイルを探す
+                drawing_files = [f for f in zip_ref.namelist()
+                                if f.startswith('xl/drawings/drawing') and f.endswith('.xml')]
+
+                if not drawing_files:
+                    return shapes_md, shapes_info
+
+                # シートに対応するdrawingファイルを見つける
+                # worksheet*.xml.relsを確認
+                rels_path = f'xl/worksheets/_rels/sheet{sheet_index}.xml.rels'
+                drawing_rel_id = None
+
+                try:
+                    rels_content = zip_ref.read(rels_path).decode('utf-8')
+                    rels_root = ET.fromstring(rels_content)
+                    rels_ns = {'rel': 'http://schemas.openxmlformats.org/package/2006/relationships'}
+
+                    for rel in rels_root.findall('.//rel:Relationship', rels_ns):
+                        if 'drawing' in rel.get('Type', '').lower():
+                            target = rel.get('Target')
+                            # ../drawings/drawing1.xml のような形式
+                            drawing_file = 'xl/drawings/' + target.split('/')[-1]
+                            if drawing_file in zip_ref.namelist():
+                                drawing_rel_id = drawing_file
+                                break
+                except:
+                    # relsファイルがない場合は、最初のdrawingファイルを使用
+                    if drawing_files:
+                        drawing_rel_id = drawing_files[0]
+
+                if not drawing_rel_id:
+                    return shapes_md, shapes_info
+
+                # drawingファイルを解析
+                drawing_content = zip_ref.read(drawing_rel_id).decode('utf-8')
+                drawing_root = ET.fromstring(drawing_content)
+
+                # 名前空間の定義
+                drawing_ns = {
+                    'xdr': 'http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing',
+                    'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'
+                }
+
+                # すべてのアンカータイプから図形を探す
+                anchor_types = ['twoCellAnchor', 'oneCellAnchor', 'absoluteAnchor']
+
+                for anchor_type in anchor_types:
+                    anchors = drawing_root.findall(f'.//xdr:{anchor_type}', drawing_ns)
+
+                    for anchor in anchors:
+                        # 図形要素を探す
+                        shape = anchor.find('.//xdr:sp', drawing_ns)
+
+                        if shape is None:
+                            continue
+
+                        self.shape_counter += 1
+
+                        # 図形名を取得
+                        shape_name = f"Shape {self.shape_counter}"
+                        nv_sp_pr = shape.find('.//xdr:nvSpPr', drawing_ns)
+                        if nv_sp_pr is not None:
+                            c_nv_pr = nv_sp_pr.find('.//xdr:cNvPr', drawing_ns)
+                            if c_nv_pr is not None:
+                                name_attr = c_nv_pr.get('name')
+                                if name_attr:
+                                    shape_name = name_attr
+
+                        # テキストを取得
+                        text_parts = []
+                        tx_body = shape.find('.//xdr:txBody', drawing_ns)
+
+                        if tx_body is not None:
+                            paragraphs = tx_body.findall('.//a:p', drawing_ns)
+
+                            for paragraph in paragraphs:
+                                para_text = []
+
+                                # テキストラン（a:r）を取得
+                                runs = paragraph.findall('.//a:r', drawing_ns)
+                                for run in runs:
+                                    t_elem = run.find('.//a:t', drawing_ns)
+                                    if t_elem is not None and t_elem.text:
+                                        para_text.append(t_elem.text)
+
+                                if para_text:
+                                    text_parts.append(''.join(para_text))
+
+                        shape_text = '\n'.join(text_parts) if text_parts else None
+
+                        # テキストがある場合のみ追加
+                        if shape_text:
+                            shape_data = {
+                                'index': self.shape_counter,
+                                'name': shape_name,
+                                'type': 'shape',
+                                'anchor_type': anchor_type,
+                                'text': shape_text
+                            }
+
+                            # 位置情報を取得
+                            position = self._get_position_from_xml_anchor(anchor, drawing_ns)
+                            if position:
+                                shape_data['position'] = position
+
+                            # Markdown形式で出力
+                            md_parts = [f"### 📐 {shape_name}"]
+                            for line in shape_text.split('\n'):
+                                if line.strip():
+                                    md_parts.append(f"> {line}")
+
+                            if position:
+                                md_parts.append(f"\n**位置情報**: {position}")
+
+                            md_shape = '\n'.join(md_parts)
+                            shapes_md.append(md_shape)
+                            shapes_info.append(shape_data)
+
+        except Exception as e:
+            print(f"ZIP解析による図形抽出エラー: {str(e)}")
+            if self.config.get('verbose_logging', False):
+                import traceback
+                traceback.print_exc()
+
+        return shapes_md, shapes_info
+
+    def _get_position_from_xml_anchor(self, anchor, ns: dict) -> str:
+        """XMLアンカーから位置情報を取得"""
+        try:
+            # twoCellAnchorの場合
+            from_elem = anchor.find('.//xdr:from', ns)
+            if from_elem is not None:
+                col_elem = from_elem.find('.//xdr:col', ns)
+                row_elem = from_elem.find('.//xdr:row', ns)
+
+                if col_elem is not None and row_elem is not None:
+                    col = int(col_elem.text) if col_elem.text else 0
+                    row = int(row_elem.text) if row_elem.text else 0
+
+                    from openpyxl.utils import get_column_letter
+                    col_letter = get_column_letter(col + 1)
+                    return f"セル {col_letter}{row + 1} 付近"
+
+            return ""
+        except Exception:
+            return ""
 
     def _get_anchor_info(self, anchor) -> str:
         """図形の位置情報を取得"""

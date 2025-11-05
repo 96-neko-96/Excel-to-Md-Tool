@@ -21,13 +21,14 @@ class SheetParser:
         """Phase 3: GeminiAnalyzerを設定"""
         self.gemini_analyzer = gemini_analyzer
 
-    def parse_sheet(self, sheet, sheet_with_values=None) -> Dict[str, Any]:
+    def parse_sheet(self, sheet, sheet_with_values=None, excel_path: str = None) -> Dict[str, Any]:
         """
         シートを解析してMarkdown形式に変換
 
         Args:
             sheet: openpyxlのWorksheetオブジェクト（数式情報用）
             sheet_with_values: 実数値を含むシート（data_only=True）
+            excel_path: Excelファイルのパス（図形抽出に使用）
 
         Returns:
             シートデータの辞書
@@ -59,7 +60,7 @@ class SheetParser:
                 sheet_data['images_count'] = len(images_info)
 
             # 図形の抽出（常に実行）
-            shapes_md, shapes_info = self.image_parser.extract_shapes(sheet)
+            shapes_md, shapes_info = self.image_parser.extract_shapes(sheet, excel_path)
             sheet_data['shapes'] = shapes_info
             sheet_data['shapes_count'] = len(shapes_info)
 
